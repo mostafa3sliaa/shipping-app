@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>طباعة بوالص الشحن</title>
+    <!-- Google Fonts: Cairo -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
+    <!-- JsBarcode -->
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+            background-color: #e0e0e0;
+            margin: 0;
+            padding: 20px;
+        }
+        .controls {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .btn {
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 18px;
+            font-family: 'Cairo', sans-serif;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-secondary {
+            background-color: #6c757d;
+        }
+        
+        .label {
+            background-color: white;
+            width: 50mm; 
+            height: 30mm;
+            margin: 0 auto 5px auto;
+            padding-top: 2mm;
+            box-sizing: border-box;
+            border: 1px dashed #ccc;
+            page-break-after: always;
+            text-align: center;
+            overflow: hidden;
+        }
+        
+        .barcode-container {
+            text-align: center;
+            margin-bottom: 1px;
+        }
+        
+        .barcode {
+            /* Let JsBarcode handle the size */
+        }
+        
+        .details {
+            font-size: 11px;
+            font-weight: bold;
+            line-height: 1.2;
+            text-align: center;
+            direction: rtl;
+        }
+        
+        @media print {
+            body {
+                background-color: white;
+                padding: 0;
+                margin: 0;
+                width: 50mm;
+                height: 30mm;
+            }
+            .controls, .alert {
+                display: none !important;
+            }
+            .label {
+                width: 50mm;
+                height: 30mm;
+                border: none;
+                margin: 0;
+                padding: 0;
+                padding-top: 1mm;
+                page-break-after: always;
+                page-break-inside: avoid;
+            }
+            @page {
+                size: 50mm 30mm;
+                margin: 0mm; 
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="controls">
+        <div class="alert alert-warning" style="background-color: #fff3cd; color: #856404; padding: 15px; margin-bottom: 20px; border-radius: 5px; text-align: right; direction: rtl; font-weight: bold; border: 1px solid #ffeeba;">
+            ⚠️ تحذير هام قبل الطباعة: في شاشة الطباعة على اليمين، تأكد من الآتي:
+            <br>1- ألغِ علامة الصح من (Headers and footers) أو (الرؤوس والتذييلات).
+            <br>2- اجعل الهوامش (Margins) ➔ بدون (None).
+            <br>3- تأكد أن حجم الورق (Paper size) ليس USER بل اختر المقاس الصحيح للبكرة (مثلاً 50x30).
+        </div>
+        <button class="btn" onclick="window.print()">طباعة الآن</button>
+        <a href="{{ url_for('orders') }}" class="btn btn-secondary">العودة للأوردرات</a>
+    </div>
+
+    {% for order in orders %}
+    <div class="label">
+        <div class="barcode-container">
+            <svg class="barcode" data-value="{{ order.tracking_number }}"></svg>
+        </div>
+        <div class="details">
+            <div style="margin-bottom: 2px;">الاسم: {{ order.client_name }}</div>
+            <div>التليفون: {{ order.phone }}</div>
+        </div>
+    </div>
+    {% endfor %}
+
+    <script>
+        JsBarcode(".barcode").init({
+            width: 1,
+            height: 25,
+            fontSize: 10,
+            margin: 0,
+            displayValue: true
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+function openEditModal(orderId) {
+        try {
+            const response = await fetch('/api/order/' + orderId);
+            const order = await response.json();
+            
+            document.getElementById('editModalTrackingNumber').innerText = order.tracking_number;
+            document.getElementById('singleEditForm').action = '/order/' + order.id + '/edit';
+            
+            document.getElementById('edit_client_name').value = order.client_name;
+            document.getElementById('edit_phone').value = order.phone;
+            document.getElementById('edit_region').value = order.region;
+            document.getElementById('edit_address').value = order.address;
+            document.getElementById('edit_cod').value = order.cod;
+            document.getElementById('edit_shipping_fee').value = order.shipping_fee;
+            document.getElementById('edit_courier_name').value = order.courier_name;
+            
+            // Map old statuses visually if needed, otherwise select
+            let status = order.status;
+            if (status === 'جديد بالمخزن') status = 'مخزن';
+            if (status === 'قيد التوصيل') status = 'مع المندوب';
+            document.getElementById('edit_status').value = status;
+            
+            document.getElementById('edit_collected_amount').value = order.collected_amount;
+            document.getElementById('edit_courier_fee').value = order.courier_fee;
+            
+            togglePartialDeliverySingle(document.getElementById('edit_status'));
+            
+            const modal = new bootstrap.Modal(document.getElementById('singleEditModal'));
+            modal.show();
+        } catch(e) {
+            alert('حدث خطأ أثناء تحميل بيانات الأوردر');
+        }
+    }

@@ -1,0 +1,126 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row mb-4 align-items-center">
+    <div class="col-md-4">
+        <h2 class="fw-bold text-primary"><i class="fa-solid fa-boxes-packing me-2"></i> سجل الأوردرات</h2>
+        <p class="text-muted">جميع البوالص المسجلة حالياً في النظام والمخزن.</p>
+    </div>
+    <div class="col-md-4">
+        <form action="{{ url_for('orders') }}" method="GET" class="d-flex shadow-sm rounded">
+            <input type="text" name="search" class="form-control form-control-lg border-0" placeholder="بحث بالاسم، التليفون، أو رقم البوليصة..." value="{{ search_query }}">
+            <button type="submit" class="btn btn-primary px-4"><i class="fa-solid fa-magnifying-glass"></i></button>
+        </form>
+    </div>
+    <div class="col-md-4 text-start">
+        <a href="{{ url_for('scan') }}" class="btn btn-warning shadow-sm me-2">
+            <i class="fa-solid fa-barcode me-1"></i> فحص باركود
+        </a>
+        <a href="{{ url_for('upload_file') }}" class="btn btn-success shadow-sm">
+            <i class="fa-solid fa-plus me-1"></i> إضافة بوالص
+        </a>
+    </div>
+</div>
+
+{% if search_query %}
+<div class="alert alert-info shadow-sm">
+    <i class="fa-solid fa-filter me-2"></i> نتائج البحث عن: <strong>{{ search_query }}</strong>
+    <a href="{{ url_for('orders') }}" class="float-start text-decoration-none text-danger">إلغاء البحث <i class="fa-solid fa-times"></i></a>
+</div>
+{% endif %}
+
+<form action="{{ url_for('bulk_action') }}" method="POST" id="bulkForm">
+    <div class="mb-3 d-flex justify-content-between align-items-center">
+        <div>
+            <div class="form-check d-inline-block me-3">
+                <input class="form-check-input border-secondary" type="checkbox" id="selectAll">
+                <label class="form-check-label fw-bold" for="selectAll">تحديد الكل</label>
+            </div>
+            <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من مسح الأوردرات المحددة؟');">
+                <i class="fa-solid fa-trash me-1"></i> مسح المحدد
+            </button>
+        </div>
+        <span class="badge bg-secondary">إجمالي المعروض: {{ orders|length }}</span>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-5">
+        <div class="card-body p-0">
+            <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                <table class="table table-hover table-striped mb-0 align-middle">
+                    <thead class="table-dark sticky-top">
+                        <tr>
+                            <th class="py-3 px-3" style="width: 40px;"></th>
+                            <th class="py-3 px-2"><i class="fa-solid fa-barcode me-1"></i> البوليصة</th>
+                            <th class="py-3"><i class="fa-solid fa-building me-1"></i> الشركة</th>
+                            <th class="py-3"><i class="fa-solid fa-user me-1"></i> العميل</th>
+                            <th class="py-3"><i class="fa-solid fa-map-location-dot me-1"></i> المنطقة</th>
+                            <th class="py-3"><i class="fa-solid fa-money-bill-1-wave me-1"></i> التحصيل</th>
+                            <th class="py-3"><i class="fa-solid fa-truck-fast me-1"></i> الشحن</th>
+                            <th class="py-3"><i class="fa-solid fa-circle-info me-1"></i> الحالة</th>
+                            <th class="py-3 text-center"><i class="fa-solid fa-gear me-1"></i> إجراء</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td class="px-3">
+                                <input class="form-check-input order-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}">
+                            </td>
+                            <td class="px-2 fw-bold text-primary">{{ order.tracking_number }}</td>
+                            <td><span class="badge bg-info text-dark">{{ order.company.name if order.company else '-' }}</span></td>
+                            <td>
+                                <div class="fw-bold">{{ order.client_name }}</div>
+                                <small class="text-muted"><i class="fa-solid fa-phone fa-sm"></i> {{ order.phone }}</small>
+                            </td>
+                            <td>{{ order.region }}</td>
+                            <td class="fw-bold text-success">{{ "{:,.2f}".format(order.cod) }}</td>
+                            <td class="text-muted">{{ order.shipping_fee }}</td>
+                            <td>
+                                {% if order.status == 'جديد بالمخزن' %}
+                                    <span class="badge bg-primary">{{ order.status }}</span>
+                                {% elif order.status == 'قيد التوصيل' %}
+                                    <span class="badge bg-warning text-dark">{{ order.status }} ({{ order.courier.name if order.courier else '' }})</span>
+                                {% elif order.status == 'مؤجل' %}
+                                    <span class="badge bg-secondary">{{ order.status }}</span>
+                                {% elif order.status == 'مرتجع' %}
+                                    <span class="badge bg-danger">{{ order.status }}</span>
+                                {% else %}
+                                    <span class="badge bg-dark">{{ order.status }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-center">
+                                <a href="{{ url_for('edit_order', order_id=order.id) }}" class="btn btn-sm btn-primary rounded-circle" title="تعديل"><i class="fa-solid fa-pen"></i></a>
+                                <button type="button" class="btn btn-sm btn-danger rounded-circle ms-1" title="مسح" onclick="if(confirm('هل تريد مسح هذا الأوردر نهائياً؟')) { document.getElementById('delete-form-{{ order.id }}').submit(); }">
+                                    <i class="fa-solid fa-trash"></i>
+                                </button>
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="9" class="text-center py-5 text-muted">
+                                <i class="fa-solid fa-box-open fa-3x mb-3 text-light"></i>
+                                <h5>لا توجد أوردرات مسجلة</h5>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</form>
+
+<!-- Hidden forms for individual delete buttons -->
+{% for order in orders %}
+<form id="delete-form-{{ order.id }}" action="{{ url_for('delete_order', order_id=order.id) }}" method="POST" style="display: none;"></form>
+{% endfor %}
+
+<script>
+    document.getElementById('selectAll').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.order-checkbox');
+        for (let checkbox of checkboxes) {
+            checkbox.checked = this.checked;
+        }
+    });
+</script>
+{% endblock %}

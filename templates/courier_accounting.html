@@ -1,0 +1,276 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<!-- Tabs Navigation -->
+<ul class="nav nav-tabs mb-4 shadow-sm bg-white rounded-top" id="mainTabs" role="tablist">
+    <li class="nav-item">
+        <a class="nav-link fw-bold text-dark px-4 py-3" href="{{ url_for('index', tab='dashboard') }}">
+            <i class="fa-solid fa-chart-pie me-2 text-primary"></i> لوحة التحكم
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link fw-bold text-dark px-4 py-3" href="{{ url_for('index', tab='orders') }}">
+            <i class="fa-solid fa-boxes-packing me-2 text-success"></i> سجل الأوردرات
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link fw-bold text-dark px-4 py-3" href="{{ url_for('company_accounting') }}">
+            <i class="fa-solid fa-building me-2 text-info"></i> حسابات الشركات
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link fw-bold text-dark active px-4 py-3" href="{{ url_for('courier_accounting') }}">
+            <i class="fa-solid fa-motorcycle me-2 text-warning"></i> تقفيل شيت المندوب
+        </a>
+    </li>
+</ul>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-warning text-dark py-3">
+        <h4 class="mb-0 fw-bold"><i class="fa-solid fa-calculator me-2"></i> تقفيل حسابات المناديب</h4>
+    </div>
+    <div class="card-body p-4">
+        
+        <form method="GET" action="{{ url_for('courier_accounting') }}" class="row align-items-end mb-4 bg-light p-3 rounded border">
+            <div class="col-md-5">
+                <label class="form-label fw-bold text-muted">اختر المندوب لتسوية عهدته:</label>
+                <select name="courier_id" class="form-select fw-bold" required>
+                    <option value="">-- اختر المندوب --</option>
+                    {% for c in couriers %}
+                    <option value="{{ c.id }}" {% if selected_courier and selected_courier.id == c.id %}selected{% endif %}>
+                        {{ c.name }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-warning fw-bold w-100"><i class="fa-solid fa-search"></i> عرض العهدة</button>
+            </div>
+        </form>
+
+        {% if selected_courier %}
+            {% if orders %}
+                <form method="POST" action="{{ url_for('courier_accounting', courier_id=selected_courier.id) }}" id="accountingForm">
+                    <input type="hidden" name="action" value="settle">
+                    
+                    <div class="row mb-3 align-items-center">
+                        <div class="col-md-6">
+                            <h5 class="fw-bold mb-0 text-primary">أوردرات المندوب (المفتوحة)</h5>
+                        </div>
+                        <div class="col-md-6 text-end">
+                            <div class="d-inline-flex align-items-center bg-white border border-primary p-2 rounded shadow-sm">
+                                <label class="fw-bold me-2 text-primary mb-0">توحيد عمولة المندوب:</label>
+                                <div class="input-group input-group-sm" style="width: 150px;">
+                                    <input type="number" id="bulkFeeInput" class="form-control fw-bold" placeholder="مثال: 40">
+                                    <button type="button" class="btn btn-primary fw-bold" onclick="applyBulkFee()">تطبيق</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="table-responsive mb-4">
+                        <table class="table table-hover align-middle border">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th width="12%">البوليصة</th>
+                                    <th width="15%">العميل</th>
+                                    <th width="10%">COD</th>
+                                    <th width="18%">تحديد الحالة النهائية</th>
+                                    <th width="15%">المبلغ المُحصل</th>
+                                    <th width="15%">عمولة المندوب</th>
+                                    <th width="15%">الإجمالي الفرعي</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in orders %}
+                                <tr id="row_{{ order.id }}" class="bg-light">
+                                    <td class="fw-bold font-monospace text-primary">{{ order.tracking_number }}</td>
+                                    <td>{{ order.client_name }}</td>
+                                    <td class="fw-bold" id="cod_{{ order.id }}" data-val="{{ order.cod }}">{{ order.cod }}</td>
+                                    <td>
+                                        <select name="status_{{ order.id }}" id="status_{{ order.id }}" class="form-select form-select-sm fw-bold status-select" onchange="updateRow('{{ order.id }}')">
+                                            <option value="مع المندوب" {% if order.status == 'مع المندوب' %}selected{% endif %}>لم يُسلم بعد (مع المندوب)</option>
+                                            <option value="تم التوصيل" {% if order.status == 'تم التوصيل' %}selected{% endif %}>تم التوصيل</option>
+                                            <option value="تسليم جزئي" {% if order.status == 'تسليم جزئي' %}selected{% endif %}>تسليم جزئي</option>
+                                            <option value="مرتجع" {% if order.status == 'مرتجع' %}selected{% endif %}>مرتجع (بدون رسوم)</option>
+                                            <option value="مرتجع بشحن" {% if order.status == 'مرتجع بشحن' %}selected{% endif %}>مرتجع (بتحصيل شحن)</option>
+                                            <option value="مؤجل" {% if order.status == 'مؤجل' %}selected{% endif %}>مؤجل</option>
+                                        </select>
+                                    </td>
+                                    <td>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" step="0.01" name="collected_{{ order.id }}" id="collected_{{ order.id }}" class="form-control text-success fw-bold" value="0" oninput="updateRow('{{ order.id }}', true)" readonly>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <div class="input-group input-group-sm">
+                                            <input type="number" step="0.01" name="courier_fee_{{ order.id }}" id="courier_fee_{{ order.id }}" class="form-control text-danger fw-bold fee-input" value="0" oninput="updateRow('{{ order.id }}')">
+                                        </div>
+                                    </td>
+                                    <td class="fw-bold fs-5">
+                                        <span id="subtotal_{{ order.id }}">0.00</span>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Totals and Final Settlement -->
+                    <div class="row justify-content-end mb-5">
+                        <div class="col-md-5">
+                            <div class="card shadow-sm border-primary">
+                                <div class="card-header bg-primary text-white py-3">
+                                    <h5 class="mb-0 fw-bold"><i class="fa-solid fa-file-invoice-dollar me-2"></i> إجمالي التقفيل لهذه العهدة</h5>
+                                </div>
+                                <div class="card-body bg-white p-4">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="fw-bold">إجمالي الأوردرات المُقفلة:</span>
+                                        <span class="text-dark fw-bold"><span id="settledCount">0</span> أوردر</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="fw-bold">إجمالي المبالغ المُحصلة:</span>
+                                        <span class="text-success fw-bold"><span id="totalCollected">0.00</span> ج.م</span>
+                                    </div>
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="fw-bold">إجمالي عمولة المندوب:</span>
+                                        <span class="text-primary fw-bold">- <span id="totalFee">0.00</span> ج.م</span>
+                                    </div>
+                                    <hr>
+                                    <div class="d-flex justify-content-between mb-3 fs-5">
+                                        <span class="fw-bold">الصافي المطلوب من المندوب:</span>
+                                        <span class="text-danger fw-bold"><span id="netCash">0.00</span> ج.م</span>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label fw-bold text-muted">خصم تحويلات بنكية / فودافون كاش (إن وُجدت):</label>
+                                        <div class="input-group">
+                                            <input type="number" step="0.01" name="transfers" id="transfersInput" class="form-control fw-bold border-danger" value="0" oninput="updateTotals()">
+                                            <span class="input-group-text bg-danger text-white">ج.م</span>
+                                        </div>
+                                    </div>
+
+                                    <div class="d-flex justify-content-between border-top pt-3 fs-3 mb-4">
+                                        <span class="fw-bold text-success">الكاش الفعلي المستلم:</span>
+                                        <span class="text-success fw-bold"><span id="finalCash">0.00</span> ج.م</span>
+                                    </div>
+
+                                    <button type="submit" class="btn btn-warning btn-lg w-100 fw-bold" onclick="return confirm('سيتم تقفيل الأوردرات المحددة فقط وتحديث حالتها. هل أنت متأكد من استلام النقدية؟');">
+                                        <i class="fa-solid fa-lock me-2"></i> تقفيل حساب المندوب الآن
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+                
+                <script>
+                    function applyBulkFee() {
+                        const bulkFee = document.getElementById('bulkFeeInput').value;
+                        if(bulkFee !== "") {
+                            const feeInputs = document.querySelectorAll('.fee-input');
+                            feeInputs.forEach(input => {
+                                // Only apply if the order is settled (not 'مع المندوب' or 'مؤجل')
+                                const id = input.id.split('_')[2];
+                                const status = document.getElementById('status_' + id).value;
+                                if (status !== 'مع المندوب' && status !== 'مؤجل') {
+                                    input.value = bulkFee;
+                                    updateRow(id);
+                                }
+                            });
+                        }
+                    }
+
+                    function updateRow(id, manualCollected = false) {
+                        const status = document.getElementById('status_' + id).value;
+                        const cod = parseFloat(document.getElementById('cod_' + id).dataset.val);
+                        const collectedInput = document.getElementById('collected_' + id);
+                        const feeInput = document.getElementById('courier_fee_' + id);
+                        const row = document.getElementById('row_' + id);
+                        
+                        if (status === 'مع المندوب' || status === 'مؤجل') {
+                            collectedInput.value = "0";
+                            collectedInput.readOnly = true;
+                            feeInput.value = "0";
+                            row.classList.remove('table-success', 'table-warning', 'table-danger');
+                            row.classList.add('bg-light');
+                        } else if (status === 'تم التوصيل') {
+                            if (!manualCollected) collectedInput.value = cod;
+                            collectedInput.readOnly = false;
+                            row.classList.remove('bg-light', 'table-warning', 'table-danger');
+                            row.classList.add('table-success');
+                        } else if (status === 'تسليم جزئي') {
+                            collectedInput.readOnly = false;
+                            row.classList.remove('bg-light', 'table-success', 'table-danger');
+                            row.classList.add('table-warning');
+                        } else if (status === 'مرتجع') {
+                            collectedInput.value = "0";
+                            collectedInput.readOnly = true;
+                            row.classList.remove('bg-light', 'table-success', 'table-warning');
+                            row.classList.add('table-danger');
+                        } else if (status === 'مرتجع بشحن') {
+                            collectedInput.readOnly = false;
+                            row.classList.remove('bg-light', 'table-success', 'table-danger');
+                            row.classList.add('table-warning');
+                        }
+                        
+                        updateTotals();
+                    }
+
+                    function updateTotals() {
+                        const selects = document.querySelectorAll('.status-select');
+                        let totalCol = 0;
+                        let totalFee = 0;
+                        let count = 0;
+
+                        selects.forEach(select => {
+                            const id = select.id.split('_')[1];
+                            const status = select.value;
+                            const subtotalEl = document.getElementById('subtotal_' + id);
+                            
+                            if (status !== 'مع المندوب' && status !== 'مؤجل') {
+                                const col = parseFloat(document.getElementById('collected_' + id).value) || 0;
+                                const fee = parseFloat(document.getElementById('courier_fee_' + id).value) || 0;
+                                
+                                totalCol += col;
+                                totalFee += fee;
+                                count += 1;
+                                subtotalEl.innerText = (col - fee).toFixed(2);
+                            } else {
+                                subtotalEl.innerText = "0.00";
+                            }
+                        });
+
+                        document.getElementById('settledCount').innerText = count;
+                        document.getElementById('totalCollected').innerText = totalCol.toFixed(2);
+                        document.getElementById('totalFee').innerText = totalFee.toFixed(2);
+                        
+                        const netCash = totalCol - totalFee;
+                        document.getElementById('netCash').innerText = netCash.toFixed(2);
+                        
+                        const transfers = parseFloat(document.getElementById('transfersInput').value) || 0;
+                        document.getElementById('finalCash').innerText = (netCash - transfers).toFixed(2);
+                    }
+
+                    // Run on load
+                    document.addEventListener('DOMContentLoaded', () => {
+                        const selects = document.querySelectorAll('.status-select');
+                        selects.forEach(select => {
+                            const id = select.id.split('_')[1];
+                            updateRow(id);
+                        });
+                    });
+                </script>
+
+            {% else %}
+                <div class="text-center py-5">
+                    <i class="fa-solid fa-face-smile-wink fa-4x text-success mb-3 opacity-50"></i>
+                    <h4>لا توجد أوردرات في عهدة هذا المندوب.</h4>
+                    <p class="text-muted">قم بتسليم الأوردرات للمندوب من شريط الإجراءات لتبدأ عهدته.</p>
+                </div>
+            {% endif %}
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

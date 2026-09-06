@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        <div class="card shadow border-0">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="fa-solid fa-plus-circle me-2"></i> إضافة أوردر يدوي جديد</h5>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST">
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">الشركة التابع لها</label>
+                        <select name="company_id" class="form-select">
+                            <option value="">-- بدون شركة (أو اختر من القائمة) --</option>
+                            {% for company in companies %}
+                            <option value="{{ company.id }}">{{ company.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">اسم العميل</label>
+                            <input type="text" name="client_name" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">رقم التليفون</label>
+                            <input type="text" name="phone" class="form-control" required>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">المنطقة</label>
+                        <input type="text" name="region" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">العنوان بالكامل</label>
+                        <textarea name="address" class="form-control" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-success">مبلغ التحصيل (COD)</label>
+                            <input type="number" step="0.01" name="cod" class="form-control" value="0" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-danger">رسوم الشحن</label>
+                            <input type="number" step="0.01" name="shipping_fee" class="form-control" value="0" required>
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    <div class="d-flex justify-content-between">
+                        <a href="{{ url_for('orders') }}" class="btn btn-secondary"><i class="fa-solid fa-times me-2"></i> إلغاء</a>
+                        <button type="submit" class="btn btn-success px-5 fw-bold"><i class="fa-solid fa-save me-2"></i> حفظ الأوردر</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

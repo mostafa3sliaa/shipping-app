@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-4">
+    <div class="col-md-8">
+        
+        <div class="card shadow border-0 mb-4">
+            <div class="card-header bg-warning text-dark text-center py-3">
+                <h4 class="mb-0 fw-bold"><i class="fa-solid fa-barcode me-2"></i> شاشة الفحص وتحديث الحالة (Scan)</h4>
+            </div>
+            <div class="card-body p-4 text-center">
+                <form method="POST" id="scanForm">
+                    <div class="mb-4">
+                        <label class="form-label text-muted">قم بتوجيه جهاز الإسكانر نحو باركود البوليصة</label>
+                        <input type="text" name="tracking_number" id="tracking_number" class="form-control form-control-lg text-center fw-bold" placeholder="أو اكتب رقم البوليصة واضغط Enter" autofocus autocomplete="off">
+                        <input type="hidden" name="action" id="actionField" value="">
+                        <input type="hidden" name="courier_id" id="courierIdField" value="">
+                    </div>
+                </form>
+                
+                {% if order %}
+                <hr>
+                <div class="text-start bg-light p-3 rounded mb-4 border">
+                    <h5 class="fw-bold text-primary">تفاصيل الأوردر: {{ order.tracking_number }}</h5>
+                    <p class="mb-1"><strong>العميل:</strong> {{ order.client_name }} - {{ order.phone }}</p>
+                    <p class="mb-1"><strong>المنطقة:</strong> {{ order.region }}</p>
+                    <p class="mb-1"><strong>التحصيل:</strong> {{ order.cod }} ج.م</p>
+                    <p class="mb-1"><strong>الحالة الحالية:</strong> <span class="badge bg-secondary">{{ order.status }}</span></p>
+                </div>
+                
+                <h5 class="mb-3">اختر الإجراء المطلوب:</h5>
+                <div class="d-flex justify-content-center gap-2 flex-wrap">
+                    
+                    <div class="dropdown">
+                        <button class="btn btn-warning btn-lg dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fa-solid fa-motorcycle me-2"></i> تسليم لمندوب
+                        </button>
+                        <ul class="dropdown-menu text-end">
+                            {% for courier in couriers %}
+                            <li><a class="dropdown-item fw-bold" href="#" onclick="submitAction('assign_courier', {{ courier.id }})">{{ courier.name }}</a></li>
+                            {% else %}
+                            <li><span class="dropdown-item text-muted">لا يوجد مناديب (قم بإضافة مناديب أولاً)</span></li>
+                            {% endfor %}
+                        </ul>
+                    </div>
+                    
+                    <button type="button" class="btn btn-secondary btn-lg" onclick="submitAction('postpone')">
+                        <i class="fa-solid fa-clock me-2"></i> تأجيل
+                    </button>
+                    
+                    <button type="button" class="btn btn-danger btn-lg" onclick="submitAction('return')">
+                        <i class="fa-solid fa-rotate-left me-2"></i> مرتجع
+                    </button>
+                </div>
+                
+                {% else %}
+                <div class="py-5 text-muted">
+                    <i class="fa-solid fa-qrcode fa-4x mb-3 opacity-25"></i>
+                    <h5>في انتظار قراءة الباركود...</h5>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+        
+    </div>
+</div>
+
+<script>
+    // Keep focus on the input field for continuous scanning if no order is displayed
+    document.addEventListener('DOMContentLoaded', function() {
+        const input = document.getElementById('tracking_number');
+        {% if not order %}
+            input.focus();
+        {% else %}
+            // If an order is loaded, keep the value in the input but maybe don't auto-focus 
+            // so they can click buttons. Or focus the buttons.
+            input.value = "{{ order.tracking_number }}";
+        {% endif %}
+        
+        // Ensure clicking anywhere outside a button brings focus back to input (useful in warehouse)
+        document.body.addEventListener('click', function(e) {
+            if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A' && !e.target.closest('.dropdown')) {
+                input.focus();
+            }
+        });
+    });
+
+    function submitAction(actionName, courierId = '') {
+        document.getElementById('actionField').value = actionName;
+        document.getElementById('courierIdField').value = courierId;
+        document.getElementById('scanForm').submit();
+    }
+</script>
+{% endblock %}

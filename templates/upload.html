@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="row justify-content-center mt-5">
+    <div class="col-md-8">
+        <div class="card shadow-lg border-0">
+            <div class="card-header bg-primary text-white text-center py-4">
+                <i class="fa-solid fa-file-excel fa-3x mb-2"></i>
+                <h4 class="mb-0 fw-bold">استيراد بوالص الشحن (رفع شيت إكسيل)</h4>
+            </div>
+            <div class="card-body p-5">
+                <div class="alert alert-info border-0 shadow-sm mb-4">
+                    <h6 class="alert-heading fw-bold"><i class="fa-solid fa-circle-info me-2"></i> تعليمات الرفع:</h6>
+                    <p class="mb-0 small">تأكد أن الشيت الخاص بك مرتب حسب الأعمدة التالية من اليسار لليمين أو من اليمين لليسار بناءً على اتجاه ملفك (الترتيب الحالي: A إلى H):</p>
+                    <hr>
+                    <ul class="row list-unstyled mb-0 small">
+                        <li class="col-6 mb-2"><span class="badge bg-secondary me-2">1</span> رقم البوليصة</li>
+                        <li class="col-6 mb-2"><span class="badge bg-secondary me-2">2</span> اسم العميل</li>
+                        <li class="col-6 mb-2"><span class="badge bg-secondary me-2">3</span> التليفون</li>
+                        <li class="col-6 mb-2"><span class="badge bg-secondary me-2">4</span> العنوان</li>
+                        <li class="col-6 mb-2"><span class="badge bg-secondary me-2">5</span> المنطقة</li>
+                        <li class="col-6 mb-2"><span class="badge bg-secondary me-2">6</span> التحصيل (COD)</li>
+                        <li class="col-6 mb-2"><span class="badge bg-secondary me-2">7</span> الشحن</li>
+                        <li class="col-6 mb-2"><span class="badge bg-secondary me-2">8</span> اسم الشركة</li>
+                    </ul>
+                </div>
+                
+                <form method="POST" enctype="multipart/form-data" class="text-center p-4 border rounded bg-light" style="border-style: dashed !important; border-width: 2px !important;">
+                    <i class="fa-solid fa-cloud-arrow-up fa-3x text-muted mb-3"></i>
+                    <h5 class="fw-bold mb-3">اختر أو اسحب الملف هنا</h5>
+                    <div class="mb-4">
+                        <input class="form-control form-control-lg w-75 mx-auto" type="file" id="file" name="file" accept=".xlsx, .xls" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg px-5 rounded-pill shadow">
+                        <i class="fa-solid fa-upload me-2"></i> بدء الرفع والحفظ
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

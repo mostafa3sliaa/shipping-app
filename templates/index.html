@@ -1,0 +1,820 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+<!-- Tabs Navigation -->
+<ul class="nav nav-tabs mb-4 shadow-sm bg-white rounded-top" id="mainTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold text-dark {% if active_tab == 'dashboard' %}active{% endif %} px-4 py-3" id="dashboard-tab" data-bs-toggle="tab" data-bs-target="#dashboard" type="button" role="tab" aria-controls="dashboard" aria-selected="{% if active_tab == 'dashboard' %}true{% else %}false{% endif %}">
+            <i class="fa-solid fa-chart-pie me-2 text-primary"></i> لوحة التحكم
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold text-dark {% if active_tab == 'orders' %}active{% endif %} px-4 py-3" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders" type="button" role="tab" aria-controls="orders" aria-selected="{% if active_tab == 'orders' %}true{% else %}false{% endif %}">
+            <i class="fa-solid fa-boxes-packing me-2 text-success"></i> سجل الأوردرات
+            {% if orders %}<span class="badge bg-secondary ms-1">{{ orders|length }}</span>{% endif %}
+        </button>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link fw-bold text-dark px-4 py-3" href="{{ url_for('company_accounting') }}">
+            <i class="fa-solid fa-building me-2 text-info"></i> حسابات الشركات
+        </a>
+    </li>
+    <li class="nav-item">
+        <a class="nav-link fw-bold text-dark px-4 py-3" href="{{ url_for('courier_accounting') }}">
+            <i class="fa-solid fa-motorcycle me-2 text-warning"></i> تقفيل شيت المندوب
+        </a>
+    </li>
+</ul>
+
+<div class="tab-content" id="mainTabsContent">
+    
+    <!-- DASHBOARD TAB -->
+    <div class="tab-pane fade {% if active_tab == 'dashboard' %}show active{% endif %}" id="dashboard" role="tabpanel" aria-labelledby="dashboard-tab">
+        
+        <div class="row mb-4 align-items-center">
+            <div class="col-md-6">
+                <h3 class="text-primary fw-bold">نظرة عامة</h3>
+            </div>
+            <div class="col-md-6 text-start">
+                <form action="{{ url_for('reset_db') }}" method="POST" class="d-inline" onsubmit="return confirm('⚠️ تحذير خطير جداً ⚠️\n\nهل أنت متأكد مليون بالمية أنك تريد مسح **كل الأوردرات والشركات والمناديب والخزينة** وتصفير السيستم بالكامل؟ لا يمكن التراجع عن هذه الخطوة!');">
+                    <button type="submit" class="btn btn-danger shadow-sm">
+                        <i class="fa-solid fa-trash-can me-2"></i> تصفير السيستم
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="row mb-4">
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-primary h-100 shadow-sm border-0">
+                    <div class="card-body text-center p-3">
+                        <i class="fa-solid fa-box-open fa-2x mb-2 text-white-50"></i>
+                        <h6 class="card-title fw-bold">مخزن</h6>
+                        <p class="display-6 fw-bold mb-0">{{ new_in_warehouse }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-dark bg-warning h-100 shadow-sm border-0">
+                    <div class="card-body text-center p-3">
+                        <i class="fa-solid fa-motorcycle fa-2x mb-2 opacity-50"></i>
+                        <h6 class="card-title fw-bold">مع المندوب</h6>
+                        <p class="display-6 fw-bold mb-0">{{ with_courier }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-danger h-100 shadow-sm border-0">
+                    <div class="card-body text-center p-3">
+                        <i class="fa-solid fa-rotate-left fa-2x mb-2 text-white-50"></i>
+                        <h6 class="card-title fw-bold">مرتجع</h6>
+                        <p class="display-6 fw-bold mb-0">{{ returned }}</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-3">
+                <div class="card text-white bg-dark h-100 shadow-sm border-0">
+                    <div class="card-body text-center p-3">
+                        <i class="fa-solid fa-building-circle-arrow-right fa-2x mb-2 text-white-50"></i>
+                        <h6 class="card-title fw-bold">مرتجع شركة</h6>
+                        <p class="display-6 fw-bold mb-0">{{ returned_company }}</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-3 mb-4">
+                <div class="card bg-light border-0 shadow-sm h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="fw-bold text-muted">البضاعة القائمة (لم تسلم)</h5>
+                            <h3 class="fw-bold text-warning mb-0">{{ "{:,.2f}".format(total_goods) }} ج.م</h3>
+                        </div>
+                        <i class="fa-solid fa-boxes-stacked fa-3x text-warning opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card bg-light border-0 shadow-sm h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="fw-bold text-muted">الخزينة (كاش)</h5>
+                            <h3 class="fw-bold text-success mb-0">{{ "{:,.2f}".format(treasury_cash) }} ج.م</h3>
+                        </div>
+                        <i class="fa-solid fa-vault fa-3x text-success opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card bg-light border-0 shadow-sm h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="fw-bold text-muted">المحفظة (تحويل)</h5>
+                            <h3 class="fw-bold text-primary mb-0">{{ "{:,.2f}".format(treasury_transfer) }} ج.م</h3>
+                        </div>
+                        <i class="fa-solid fa-building-columns fa-3x text-primary opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 mb-4">
+                <div class="card bg-dark text-white border-0 shadow-sm h-100" style="background: linear-gradient(45deg, #198754, #20c997) !important;">
+                    <div class="card-body d-flex justify-content-between align-items-center">
+                        <div>
+                            <h5 class="fw-bold text-white-50">الأرباح (المُحصلة)</h5>
+                            <h3 class="fw-bold text-white mb-0">{{ "{:,.2f}".format(company_profit) }} ج.م</h3>
+                        </div>
+                        <i class="fa-solid fa-chart-line fa-3x text-white opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white fw-bold"><i class="fa-solid fa-map-location-dot text-info me-2"></i> إحصائيات المناطق</div>
+                    <div class="card-body p-0">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>المنطقة</th>
+                                    <th>الأوردرات</th>
+                                    <th>الصافي (ج.م)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for r_name, count, net in region_stats %}
+                                <tr>
+                                    <td class="fw-bold"><span class="badge d-inline-block border border-secondary text-dark" style="background-color: {{ r_name|string_color }};">{{ r_name if r_name else 'غير محدد' }}</span></td>
+                                    <td>{{ count }}</td>
+                                    <td class="text-success fw-bold">{{ "{:,.2f}".format(net or 0) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6 mb-4">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-header bg-white fw-bold"><i class="fa-solid fa-building text-primary me-2"></i> إحصائيات الشركات</div>
+                    <div class="card-body p-0">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>الشركة</th>
+                                    <th>الأوردرات</th>
+                                    <th>الصافي (ج.م)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for c_name, count, net in company_stats %}
+                                <tr>
+                                    <td class="fw-bold"><span class="badge bg-info text-dark">{{ c_name }}</span></td>
+                                    <td>{{ count }}</td>
+                                    <td class="text-success fw-bold">{{ "{:,.2f}".format(net or 0) }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- ORDERS TAB -->
+    <div class="tab-pane fade {% if active_tab == 'orders' %}show active{% endif %}" id="orders" role="tabpanel" aria-labelledby="orders-tab">
+        
+        <!-- Filter Summary Boxes -->
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <button type="button" class="btn btn-outline-primary shadow-sm me-2 fw-bold" data-bs-toggle="modal" data-bs-target="#newOrderModal">
+                    <i class="fa-solid fa-plus me-1"></i> إضافة أوردر يدوي
+                </button>
+                <button type="button" class="btn btn-success shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#uploadModal">
+                    <i class="fa-solid fa-cloud-arrow-up me-2"></i> استيراد شيت إكسيل
+                </button>
+            </div>
+            <div class="card bg-primary text-white border-0 shadow-sm rounded-4" style="min-width: 220px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
+                <div class="card-body d-flex justify-content-between align-items-center py-2 px-4">
+                    <div>
+                        <h6 class="mb-0 fw-bold text-white-50">عدد الأوردرات</h6>
+                        <h3 class="mb-0 fw-bold">{{ filtered_orders_count }}</h3>
+                    </div>
+                    <i class="fa-solid fa-boxes-stacked fa-2x text-white opacity-50 ms-3"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3 bg-light">
+            <div class="card-body py-3">
+                <form action="{{ url_for('index') }}" method="GET" class="row g-2 align-items-center">
+                    <input type="hidden" name="tab" value="orders">
+                    
+                    <div class="col-md-3">
+                        <div class="input-group">
+                            <span class="input-group-text bg-primary text-white"><i class="fa-solid fa-search"></i></span>
+                            <input type="text" id="liveSearchInput" name="search" class="form-control border-primary" placeholder="بحث بالبوليصة، الاسم..." value="{{ search_query }}" oninput="liveSearch()">
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <select name="company_id" class="form-select border-primary" onchange="this.form.submit()">
+                            <option value="">-- كل الشركات --</option>
+                            {% for company in companies %}
+                            <option value="{{ company.id }}" {% if filter_company == company.id|string %}selected{% endif %}>{{ company.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <select name="courier_id" class="form-select border-primary" onchange="this.form.submit()">
+                            <option value="">-- كل المناديب --</option>
+                            {% for c in couriers %}
+                            <option value="{{ c.id }}" {% if filter_courier == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <div class="col-md-2">
+                        <select name="region" class="form-select border-primary" onchange="this.form.submit()">
+                            <option value="">-- كل المناطق --</option>
+                            {% for r in regions %}
+                            <option value="{{ r }}" {% if filter_region == r %}selected{% endif %}>{{ r }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-2">
+                        <select name="status" class="form-select border-primary" onchange="this.form.submit()">
+                            <option value="">-- كل الحالات --</option>
+                            {% for status in statuses %}
+                            <option value="{{ status }}" {% if filter_status == status %}selected{% endif %}>{{ status }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="col-md-1 d-flex gap-2">
+                        {% if search_query or filter_company or filter_status or filter_courier or filter_region %}
+                        <a href="{{ url_for('index', tab='orders') }}" class="btn btn-outline-danger w-100 fw-bold" title="إلغاء الفلاتر"><i class="fa-solid fa-times"></i></a>
+                        {% endif %}
+                        <!-- Hidden submit for enter key in search -->
+                        <button type="submit" style="display: none;"></button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+
+        <div class="mb-3">
+            <form id="inlineScannerForm" onsubmit="handleInlineScan(event)">
+                <div class="input-group input-group-lg shadow-sm mb-2">
+                    <span class="input-group-text bg-warning border-warning"><i class="fa-solid fa-barcode fa-lg"></i></span>
+                    <input type="text" id="inline_tracking_number" class="form-control border-warning fw-bold text-center" placeholder="امسح الباركود أو اكتب التليفون / الاسم ثم اضغط Enter..." autofocus autocomplete="off">
+                    <button class="btn btn-warning fw-bold px-4 border-warning" type="submit">فحص السجل</button>
+                </div>
+                <div id="inlineScanFeedback" class="text-danger fw-bold small ms-2"></div>
+            </form>
+        </div>
+
+        <form action="{{ url_for('bulk_action') }}" method="POST" id="bulkForm">
+            <div class="mb-2 d-flex justify-content-between align-items-center bg-light p-3 rounded border shadow-sm">
+                <div>
+                    <div class="form-check d-inline-block me-3">
+                        <input class="form-check-input border-secondary" type="checkbox" id="selectAll">
+                        <label class="form-check-label fw-bold" for="selectAll">تحديد الكل</label>
+                    </div>
+                </div>
+                <div class="d-flex gap-2 flex-wrap">
+                    <span class="text-muted align-self-center small fw-bold me-2">إجراء على المحدد:</span>
+                    <input type="hidden" name="action" id="mainBulkActionField">
+                    <div class="input-group input-group-sm" style="width: 250px;">
+                        <input type="text" name="courier_name" list="couriers_list" class="form-control border-warning fw-bold" placeholder="اسم المندوب..." onkeypress="if(event.key === 'Enter'){ event.preventDefault(); document.getElementById('mainBulkActionField').value='assign_courier'; this.form.submit(); }">
+                        <button type="submit" class="btn btn-warning fw-bold" onclick="document.getElementById('mainBulkActionField').value='assign_courier'">
+                            <i class="fa-solid fa-motorcycle me-1"></i> تسليم
+                        </button>
+                    </div>
+
+                    <div class="input-group input-group-sm" style="width: 200px;">
+                        <input type="text" name="bulk_region_name" list="regions_list" class="form-control border-info fw-bold" placeholder="اسم المنطقة..." onkeypress="if(event.key === 'Enter'){ event.preventDefault(); document.getElementById('mainBulkActionField').value='set_region'; this.form.submit(); }">
+                        <datalist id="regions_list">
+                            {% for r in regions %}
+                            <option value="{{ r }}">
+                            {% endfor %}
+                        </datalist>
+                        <button type="submit" class="btn btn-info text-white fw-bold" onclick="document.getElementById('mainBulkActionField').value='set_region'">
+                            <i class="fa-solid fa-map-location-dot me-1"></i> تعيين
+                        </button>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold" onclick="document.getElementById('mainBulkActionField').value='warehouse'">
+                        <i class="fa-solid fa-warehouse me-1"></i> مخزن
+                    </button>
+                    
+                    <button type="submit" class="btn btn-sm btn-dark fw-bold" onclick="document.getElementById('mainBulkActionField').value='return_company'">
+                        <i class="fa-solid fa-building-circle-arrow-right me-1"></i> مرتجع شركة
+                    </button>
+                    
+                    <button type="submit" class="btn btn-sm btn-success fw-bold" onclick="document.getElementById('mainBulkActionField').value='delivered'">
+                        <i class="fa-solid fa-check-double me-1"></i> تم التوصيل
+                    </button>
+
+                    <button type="submit" class="btn btn-sm btn-danger fw-bold" onclick="document.getElementById('mainBulkActionField').value='return'">
+                        <i class="fa-solid fa-rotate-left me-1"></i> مرتجع
+                    </button>
+
+                    <button type="submit" class="btn btn-sm btn-outline-dark fw-bold ms-2" onclick="document.getElementById('mainBulkActionField').value='unmark_copied'">
+                        <i class="fa-solid fa-eraser me-1"></i> إلغاء علامة النسخ
+                    </button>
+
+                    <button type="submit" class="btn btn-sm btn-outline-danger fw-bold ms-3" onclick="document.getElementById('mainBulkActionField').value='delete'; return confirm('هل أنت متأكد من مسح الأوردرات المحددة؟');">
+                        <i class="fa-solid fa-trash me-1"></i> مسح نهائي
+                    </button>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0 mb-5">
+                <div class="card-body p-0">
+                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
+                        <table class="table table-hover table-striped mb-0 align-middle">
+                            <thead class="table-dark sticky-top">
+                                <tr>
+                                    <th class="py-3 px-3" style="width: 40px;"></th>
+                                    <th class="py-3 px-2"><i class="fa-solid fa-barcode me-1"></i> البوليصة</th>
+                                    <th class="py-3">التاريخ</th>
+                                    <th class="py-3"><i class="fa-solid fa-building me-1"></i> الشركة</th>
+                                    <th class="py-3"><i class="fa-solid fa-user me-1"></i> العميل</th>
+                                    <th class="py-3"><i class="fa-solid fa-map-location-dot me-1"></i> العنوان</th>
+                                    <th class="py-3">المحتوى</th>
+                                    <th class="py-3"><i class="fa-solid fa-money-bill-1-wave me-1"></i> م.تحصيل</th>
+                                    <th class="py-3"><i class="fa-solid fa-truck-fast me-1"></i> م.شحن</th>
+                                    <th class="py-3"><i class="fa-solid fa-circle-info me-1"></i> الحالة</th>
+                                    <th class="py-3 text-center"><i class="fa-solid fa-gear me-1"></i> إجراء</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for order in orders %}
+                                <tr id="order-row-{{ order.id }}" class="{% if order.is_copied %}bg-success bg-opacity-25{% else %}bg-white{% endif %}">
+                                    <td class="px-3">
+                                        <input class="form-check-input order-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}" id="checkbox-{{ order.id }}">
+                                    </td>
+                                    <td class="px-2 fw-bold text-primary">{{ order.tracking_number }}</td>
+                                    <td>
+                                        {% if order.created_at %}
+                                        <small class="text-muted">{{ order.created_at.strftime('%Y-%m-%d') }}</small>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-info text-dark d-block mb-1">{{ order.company.name if order.company else '-' }}</span>
+                                        {% if order.region %}
+                                        <span class="badge d-block text-dark border border-secondary" style="background-color: {{ order.region|string_color }};">
+                                            <i class="fa-solid fa-map-pin me-1 opacity-75"></i> {{ order.region }}
+                                        </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        <div class="fw-bold">{{ order.client_name }}</div>
+                                        <small class="text-muted"><i class="fa-solid fa-phone fa-sm"></i> {{ order.phone }}</small>
+                                    </td>
+                                    <td>
+                                        <div class="text-wrap" style="max-width: 250px; font-size: 0.9rem;">{{ order.address }}</div>
+                                    </td>
+                                    <td>
+                                        <div class="text-wrap text-muted" style="max-width: 150px; font-size: 0.8rem;">
+                                            {{ order.content if order.content else '-' }}
+                                        </div>
+                                    </td>
+                                    <td class="fw-bold text-success">{{ "{:,.2f}".format(order.cod) }}</td>
+                                    <td class="text-muted">{{ order.shipping_fee }}</td>
+                                    <td>
+                                        {% if order.status == 'مخزن' or order.status == 'جديد بالمخزن' %}
+                                            <span class="badge bg-primary">مخزن</span>
+                                        {% elif order.status == 'مع المندوب' or order.status == 'قيد التوصيل' %}
+                                            <span class="badge bg-warning text-dark px-2 py-1"><i class="fa-solid fa-motorcycle me-1"></i> {{ order.courier.name if order.courier else 'مع المندوب' }}</span>
+                                        {% elif order.status == 'مؤجل' %}
+                                            <span class="badge bg-secondary">مؤجل</span>
+                                        {% elif order.status == 'مرتجع' %}
+                                            <span class="badge bg-danger">مرتجع</span>
+                                        {% elif order.status == 'مرتجع شركة' %}
+                                            <span class="badge bg-dark">مرتجع شركة</span>
+                                        {% else %}
+                                            <span class="badge bg-dark">{{ order.status }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center" style="min-width: 120px;">
+                                        <button type="button" class="btn btn-sm {% if order.is_copied %}btn-dark{% else %}btn-success{% endif %} rounded-circle mb-1" title="نسخ للمندوب" onclick="copyOrderDetails({{ order.id }}, this)"
+                                                data-client="{{ order.client_name }}" 
+                                                data-phone="{{ order.phone }}"
+                                                data-address="{{ order.address }}"
+                                                data-content="{{ order.content if order.content else '' }}"
+                                                data-price="{{ order.cod }}">
+                                            {% if order.is_copied %}<i class="fa-solid fa-check"></i>{% else %}<i class="fa-brands fa-whatsapp"></i>{% endif %}
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-primary rounded-circle mb-1" title="تعديل" onclick="openEditModal({{ order.id }})">
+                                            <i class="fa-solid fa-pen"></i>
+                                        </button>
+                                        <button type="button" class="btn btn-sm btn-danger rounded-circle mb-1" title="مسح" onclick="if(confirm('هل تريد مسح هذا الأوردر نهائياً؟')) { document.getElementById('delete-form-{{ order.id }}').submit(); }">
+                                            <i class="fa-solid fa-trash"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                {% else %}
+                                <tr>
+                                    <td colspan="9" class="text-center py-5 text-muted">
+                                        <i class="fa-solid fa-box-open fa-3x mb-3 opacity-25"></i>
+                                        <h5>لا توجد أوردرات مسجلة</h5>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </form>
+
+        {% for order in orders %}
+        <form id="delete-form-{{ order.id }}" action="{{ url_for('delete_order', order_id=order.id) }}" method="POST" style="display: none;"></form>
+        {% endfor %}
+        
+        <!-- Single Edit Modal for ALL orders -->
+        <div class="modal fade" id="singleEditModal" tabindex="-1" aria-hidden="true">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content text-end">
+                    <div class="modal-header bg-primary text-white">
+                        <h5 class="modal-title"><i class="fa-solid fa-pen-to-square me-2"></i> تعديل بيانات الأوردر (<span id="editModalTrackingNumber"></span>)</h5>
+                        <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body bg-light">
+                        <form id="singleEditForm" action="" method="POST">
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">اسم العميل</label>
+                                    <input type="text" name="client_name" id="edit_client_name" class="form-control">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">رقم التليفون</label>
+                                    <input type="text" name="phone" id="edit_phone" class="form-control">
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">المنطقة</label>
+                                <input type="text" name="region" id="edit_region" class="form-control">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">العنوان بالكامل</label>
+                                <textarea name="address" id="edit_address" class="form-control" rows="2"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold text-info">المنتج / تفاصيل الأوردر</label>
+                                <textarea name="content" id="edit_content" class="form-control" rows="2"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label fw-bold">الشركة التابع لها (اختر أو اكتب شركة جديدة)</label>
+                                <input type="text" name="company_name" id="edit_company_name" list="companyListEdit" class="form-control border-primary" placeholder="اكتب اسم الشركة هنا...">
+                                <datalist id="companyListEdit">
+                                    {% for company in companies %}
+                                    <option value="{{ company.name }}"></option>
+                                    {% endfor %}
+                                </datalist>
+                            </div>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold text-success">مبلغ التحصيل (COD)</label>
+                                    <input type="number" step="0.01" name="cod" id="edit_cod" class="form-control">
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold text-danger">رسوم الشحن</label>
+                                    <input type="number" step="0.01" name="shipping_fee" id="edit_shipping_fee" class="form-control">
+                                </div>
+                            </div>
+                            <hr>
+                            <div class="row">
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">اسم المندوب</label>
+                                    <input type="text" name="courier_name" id="edit_courier_name" list="couriers_list" class="form-control border-warning" placeholder="اكتب اسم المندوب أو اختر...">
+                                    <datalist id="couriers_list">
+                                        {% for courier in couriers %}
+                                        <option value="{{ courier.name }}">
+                                        {% endfor %}
+                                    </datalist>
+                                    <small class="text-muted">بمجرد كتابة اسم مندوب ستتحول الحالة لـ (مع المندوب).</small>
+                                </div>
+                                <div class="col-md-6 mb-3">
+                                    <label class="form-label fw-bold">الحالة</label>
+                                    <select name="status" id="edit_status" class="form-select border-primary" onchange="togglePartialDeliverySingle(this)">
+                                        {% for status in statuses %}
+                                        <option value="{{ status }}">{{ status }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <!-- Partial Delivery & Accounting Fields -->
+                            <div class="row bg-warning bg-opacity-10 p-2 rounded mt-2 border border-warning" id="single-accounting-fields" style="display: none;">
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label fw-bold text-success">المبلغ المُحصل فعلياً</label>
+                                    <input type="number" step="0.01" name="collected_amount" id="edit_collected_amount" class="form-control">
+                                </div>
+                                <div class="col-md-6 mb-2">
+                                    <label class="form-label fw-bold text-primary">عمولة المندوب (المتفق عليها)</label>
+                                    <input type="number" step="0.01" name="courier_fee" id="edit_courier_fee" class="form-control">
+                                </div>
+                            </div>
+                            <div class="d-flex justify-content-end mt-3">
+                                <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">إلغاء</button>
+                                <button type="submit" class="btn btn-success"><i class="fa-solid fa-save me-1"></i> حفظ التعديلات</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+
+</div>
+
+<!-- ================= MODALS ================= -->
+
+<!-- Upload Modal -->
+<div class="modal fade" id="uploadModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content text-end">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title"><i class="fa-solid fa-cloud-arrow-up me-2"></i> رفع شيت إكسيل</h5>
+                <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <form action="{{ url_for('upload_file') }}" method="POST" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="company_name" class="form-label fw-bold">اسم الشركة / البائع</label>
+                        <input type="text" class="form-control border-success" id="company_name" name="company_name" placeholder="مثال: شركة النور أو سهله" required>
+                    </div>
+                    <div class="mb-4">
+                        <label for="file" class="form-label fw-bold">اختر ملف الإكسيل (.xlsx أو .xls)</label>
+                        <input class="form-control border-success" type="file" id="file" name="file" accept=".xlsx, .xls" required>
+                    </div>
+                    <div class="alert alert-warning p-2 small">
+                        <i class="fa-solid fa-info-circle me-1"></i> سيتم تخصيص جميع الأوردرات في هذا الملف للشركة التي أدخلتها.
+                    </div>
+                    <div class="d-flex justify-content-end">
+                        <button type="submit" class="btn btn-success px-4 fw-bold"><i class="fa-solid fa-upload me-1"></i> رفع وحفظ وبدء الطباعة</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Order Modal -->
+<div class="modal fade" id="newOrderModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content text-end">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title"><i class="fa-solid fa-plus-circle me-2"></i> إضافة أوردر يدوي جديد</h5>
+                <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body bg-light">
+                <form action="{{ url_for('new_order') }}" method="POST">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">الشركة التابع لها (اختر أو اكتب شركة جديدة)</label>
+                        <input type="text" name="company_name" list="companyList" class="form-control border-primary" placeholder="اكتب اسم الشركة هنا...">
+                        <datalist id="companyList">
+                            {% for company in companies %}
+                            <option value="{{ company.name }}"></option>
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">اسم العميل</label>
+                            <input type="text" name="client_name" class="form-control" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold">رقم التليفون</label>
+                            <input type="text" name="phone" class="form-control" required>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">المنطقة</label>
+                        <input type="text" name="region" class="form-control" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">العنوان بالكامل</label>
+                        <textarea name="address" class="form-control" rows="2"></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold text-info">المنتج / تفاصيل الأوردر</label>
+                        <textarea name="content" class="form-control" rows="2" placeholder="اكتب وصف المنتج هنا..."></textarea>
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-success">مبلغ التحصيل (COD)</label>
+                            <input type="number" step="0.01" name="cod" class="form-control" value="0" required>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <label class="form-label fw-bold text-danger">رسوم الشحن</label>
+                            <input type="number" step="0.01" name="shipping_fee" class="form-control" value="0" required>
+                        </div>
+                    </div>
+                    <div class="d-flex justify-content-end mt-3">
+                        <button type="button" class="btn btn-secondary me-2" data-bs-dismiss="modal">إلغاء</button>
+                        <button type="submit" class="btn btn-primary px-4 fw-bold"><i class="fa-solid fa-save me-1"></i> حفظ الأوردر</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Scanner focus logic
+    document.addEventListener('DOMContentLoaded', function() {
+        const scanTabButton = document.getElementById('scan-tab');
+        const scanInput = document.getElementById('ajax_tracking_number');
+        
+        // Focus input when Scan tab is shown
+        if (scanTabButton && scanInput) {
+            scanTabButton.addEventListener('shown.bs.tab', function () {
+                scanInput.focus();
+            });
+            
+            // Auto-focus logic if we are already in the scan tab
+            {% if active_tab == 'scan' %}
+                scanInput.focus();
+                
+                // Keep focus if clicking outside inputs or dropdowns
+                document.body.addEventListener('click', function(e) {
+                    if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A' && e.target.tagName !== 'INPUT' && e.target.tagName !== 'SELECT' && !e.target.closest('.dropdown')) {
+                        scanInput.focus();
+                    }
+                });
+            {% endif %}
+        }
+    });
+
+    // Inline Scanner Logic in Orders Tab
+    async function handleInlineScan(event) {
+        event.preventDefault();
+        const inputElement = document.getElementById('inline_tracking_number');
+        const feedbackElement = document.getElementById('inlineScanFeedback');
+        const query = inputElement.value.trim();
+        
+        if (!query) return;
+        
+        inputElement.value = ''; // clear for next scan
+        feedbackElement.innerText = '';
+        
+        try {
+            const response = await fetch(`/api/scan?q=${encodeURIComponent(query)}`);
+            const data = await response.json();
+            
+            if (!response.ok) {
+                feedbackElement.innerText = data.error || 'حدث خطأ أثناء البحث';
+                return;
+            }
+            
+            const orders = data.orders;
+            const tbody = document.querySelector('#bulkForm table tbody');
+            let addedAny = false;
+            
+            orders.forEach(order => {
+                const tr = document.getElementById(`order-row-${order.id}`);
+                const checkbox = document.getElementById(`checkbox-${order.id}`);
+                
+                if (tr && checkbox) {
+                    addedAny = true;
+                    // Move row to the top
+                    tbody.prepend(tr);
+                    
+                    // Check the checkbox
+                    checkbox.checked = true;
+                    
+                    // Highlight the row temporarily
+                    const originalBg = tr.className;
+                    tr.className = 'table-warning transition-all';
+                    setTimeout(() => {
+                        tr.className = originalBg;
+                    }, 1500);
+                }
+            });
+            
+            if (!addedAny) {
+                feedbackElement.innerText = 'هذا الأوردر غير موجود في الصفحة الحالية (أو تم مسحه)';
+            }
+            
+        } catch (error) {
+            feedbackElement.innerText = 'فشل الاتصال بالخادم';
+        }
+    }
+    
+    // === Live Search ===
+    function liveSearch() {
+        const input = document.getElementById('liveSearchInput').value.toLowerCase();
+        const rows = document.querySelectorAll('tbody tr[id^="order-row-"]');
+        
+        rows.forEach(row => {
+            const text = row.innerText.toLowerCase();
+            if (text.includes(input)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    // Select all checkboxes logic
+    const selectAllBtn = document.getElementById('selectAll');
+    if (selectAllBtn) {
+        selectAllBtn.addEventListener('change', function() {
+            const checkboxes = document.querySelectorAll('.order-checkbox');
+            for (let checkbox of checkboxes) {
+                checkbox.checked = this.checked;
+            }
+        });
+    }
+
+    // Single Edit Modal JS
+    async function openEditModal(orderId) {
+        try {
+            const response = await fetch('/api/order/' + orderId);
+            const order = await response.json();
+            
+            document.getElementById('editModalTrackingNumber').innerText = order.tracking_number;
+            document.getElementById('singleEditForm').action = '/order/' + order.id + '/edit';
+            
+            document.getElementById('edit_client_name').value = order.client_name;
+            document.getElementById('edit_phone').value = order.phone;
+            document.getElementById('edit_region').value = order.region;
+            document.getElementById('edit_address').value = order.address;
+            document.getElementById('edit_content').value = order.content;
+            document.getElementById('edit_company_name').value = order.company_name;
+            document.getElementById('edit_cod').value = order.cod;
+            document.getElementById('edit_shipping_fee').value = order.shipping_fee;
+            document.getElementById('edit_courier_name').value = order.courier_name;
+            
+            // Map old statuses visually if needed, otherwise select
+            let status = order.status;
+            if (status === 'جديد بالمخزن') status = 'مخزن';
+            if (status === 'قيد التوصيل') status = 'مع المندوب';
+            document.getElementById('edit_status').value = status;
+            
+            document.getElementById('edit_collected_amount').value = order.collected_amount;
+            document.getElementById('edit_courier_fee').value = order.courier_fee;
+            
+            togglePartialDeliverySingle(document.getElementById('edit_status'));
+            
+            const modal = new bootstrap.Modal(document.getElementById('singleEditModal'));
+            modal.show();
+        } catch(e) {
+            alert('حدث خطأ أثناء تحميل بيانات الأوردر');
+        }
+    }
+
+    function togglePartialDeliverySingle(selectElement) {
+        const fields = document.getElementById('single-accounting-fields');
+        if (selectElement.value === 'تسليم جزئي' || selectElement.value === 'تم التوصيل') {
+            fields.style.display = 'flex';
+        } else {
+            fields.style.display = 'none';
+        }
+    }
+
+    // === Copy Order Details ===
+    function copyOrderDetails(orderId, btnElement) {
+        const client = btnElement.getAttribute('data-client');
+        const phone = btnElement.getAttribute('data-phone');
+        const address = btnElement.getAttribute('data-address');
+        const content = btnElement.getAttribute('data-content');
+        const price = btnElement.getAttribute('data-price');
+        
+        const textToCopy = `العميل: ${client}\nالهاتف: ${phone}\nالعنوان: ${address}\nالمنتج: ${content}\nالسعر: ${price}`;
+        
+        navigator.clipboard.writeText(textToCopy).then(() => {
+            // Save to DB
+            fetch('/api/order/' + orderId + '/copy', { method: 'POST' });
+
+            // Change button to indicate success
+            btnElement.classList.remove('btn-success');
+            btnElement.classList.add('btn-dark');
+            btnElement.innerHTML = '<i class="fa-solid fa-check"></i>';
+            
+            // Highlight the row specifically to mark it as copied
+            const tr = document.getElementById(`order-row-${orderId}`);
+            if (tr) {
+                tr.classList.remove('bg-white');
+                tr.classList.add('bg-success', 'bg-opacity-25'); // A light green background
+            }
+        }).catch(err => {
+            alert('حدث خطأ أثناء النسخ!');
+        });
+    }
+
+</script>
+{% endblock %}
