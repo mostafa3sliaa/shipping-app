@@ -97,8 +97,8 @@
                                     <td class="fw-bold" id="cod_{{ order.id }}" data-val="{{ order.cod }}">{{ order.cod }}</td>
                                     <td>
                                         <select name="status_{{ order.id }}" id="status_{{ order.id }}" class="form-select form-select-sm fw-bold status-select" onchange="updateRow('{{ order.id }}')">
-                                            <option value="مع المندوب" {% if order.status == 'مع المندوب' %}selected{% endif %}>لم يُسلم بعد (مع المندوب)</option>
-                                            <option value="تم التوصيل" {% if order.status == 'تم التوصيل' %}selected{% endif %}>تم التوصيل</option>
+                                            <option value="مع المندوب">لم يُسلم بعد (مع المندوب)</option>
+                                            <option value="تم التوصيل" {% if order.status in ['تم التوصيل', 'مع المندوب'] %}selected{% endif %}>تم التوصيل</option>
                                             <option value="تسليم جزئي / مرتجع" {% if order.status == 'تسليم جزئي / مرتجع' %}selected{% endif %}>تسليم جزئي / مرتجع</option>
                                             <option value="مرتجع" {% if order.status == 'مرتجع' %}selected{% endif %}>مرتجع (بدون رسوم)</option>
                                             <option value="مرتجع بشحن" {% if order.status == 'مرتجع بشحن' %}selected{% endif %}>مرتجع (بتحصيل شحن)</option>
