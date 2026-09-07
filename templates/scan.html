@@ -67,7 +67,7 @@
 
 <script>
     // Keep focus on the input field for continuous scanning if no order is displayed
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('turbo:load', function() {
         const input = document.getElementById('tracking_number');
         {% if not order %}
             input.focus();

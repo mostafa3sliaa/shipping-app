@@ -678,7 +678,7 @@
 
 <script>
     // Quick Paste Parser Logic
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('turbo:load', function() {
         const pasteArea = document.getElementById('quickPasteArea');
         if (pasteArea) {
             pasteArea.addEventListener('input', function(e) {
@@ -717,7 +717,7 @@
     });
 
     // Scanner focus logic
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('turbo:load', function() {
         const scanTabButton = document.getElementById('scan-tab');
         const scanInput = document.getElementById('ajax_tracking_number');
         

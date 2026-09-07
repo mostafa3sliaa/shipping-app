@@ -261,7 +261,7 @@
                     }
 
                     // Run on load
-                    document.addEventListener('DOMContentLoaded', () => {
+                    document.addEventListener('turbo:load', () => {
                         const selects = document.querySelectorAll('.status-select');
                         selects.forEach(select => {
                             const id = select.id.split('_')[1];
