@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow mt-5 border-0">
+            <div class="card-header bg-primary text-white text-center">
+                <h4 class="mb-0"><i class="fa-solid fa-lock"></i> تسجيل الدخول للنظام</h4>
+            </div>
+            <div class="card-body p-4">
+                <form method="POST" action="{{ url_for('login') }}">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اسم المستخدم</label>
+                        <input type="text" name="username" class="form-control form-control-lg" required autofocus autocomplete="off">
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">كلمة المرور</label>
+                        <input type="password" name="password" class="form-control form-control-lg" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary btn-lg w-100 fw-bold">
+                        <i class="fa-solid fa-right-to-bracket"></i> دخول
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

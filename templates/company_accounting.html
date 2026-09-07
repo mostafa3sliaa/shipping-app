@@ -24,6 +24,13 @@
             <i class="fa-solid fa-motorcycle me-2 text-warning"></i> تقفيل شيت المندوب
         </a>
     </li>
+    {% if current_user.is_authenticated %}
+    <li class="nav-item ms-auto">
+        <a class="nav-link fw-bold text-danger px-4 py-3" href="{{ url_for('logout') }}">
+            <i class="fa-solid fa-sign-out-alt me-2"></i> خروج
+        </a>
+    </li>
+    {% endif %}
 </ul>
 
 <div class="card shadow-sm border-0 mb-4">

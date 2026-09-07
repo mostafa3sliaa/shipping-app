@@ -6,10 +6,10 @@ import hashlib
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
-from sqlalchemy import or_, text
-from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy import or_, text
+from datetime import datetime
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'
@@ -28,19 +28,20 @@ def string_color(s):
     return f'hsl({h}, 70%, 85%)'
 
 db = SQLAlchemy(app)
-
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
 login_manager.login_message = 'يرجى تسجيل الدخول للوصول إلى هذه الصفحة'
 login_manager.login_message_category = 'warning'
 
+
+
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
     role = db.Column(db.String(20), default='admin')
-
+    
 @login_manager.user_loader
 def load_user(user_id):
     return db.session.get(User, int(user_id))
@@ -94,13 +95,12 @@ class TreasuryTransaction(db.Model):
 with app.app_context():
 
     db.create_all()
-    
-    # Create default admin if not exists
     if not User.query.filter_by(username='admin').first():
         hashed = generate_password_hash('admin123')
         default_admin = User(username='admin', password_hash=hashed, role='admin')
         db.session.add(default_admin)
         db.session.commit()
+
     # Safely add columns if they don't exist (SQLite)
     new_columns = [
         'batch_id VARCHAR(50)',
@@ -122,6 +122,9 @@ with app.app_context():
     Order.query.filter_by(status='جديد بالمخزن').update({'status': 'مخزن'})
     Order.query.filter_by(status='قيد التوصيل').update({'status': 'مع المندوب'})
     db.session.commit()
+
+@app.route('/')
+@login_required
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -207,7 +210,8 @@ def index():
     filter_courier = request.args.get('courier_id', '')
     filter_region = request.args.get('region', '')
     
-    query = Order.query
+    from sqlalchemy.orm import joinedload
+    query = Order.query.options(joinedload(Order.company), joinedload(Order.courier))
     
     if search_query:
         query = query.filter(or_(
@@ -304,6 +308,7 @@ def index():
                            scanned_query=scanned_tracking)
 
 @app.route('/order/new', methods=['POST'])
+@login_required
 def new_order():
     client_name = request.form.get('client_name', '').strip()
     phone = request.form.get('phone', '').strip()
@@ -347,6 +352,7 @@ def new_order():
     return redirect(url_for('index', tab='orders'))
 
 @app.route('/upload', methods=['POST'])
+@login_required
 def upload_file():
     if 'file' not in request.files:
         flash('لم يتم العثور على ملف', 'danger')
@@ -526,6 +532,7 @@ def upload_file():
         return redirect(url_for('index'))
 
 @app.route('/print/<batch_id>')
+@login_required
 def print_batch(batch_id):
     orders_to_print = Order.query.filter_by(batch_id=batch_id).all()
     if not orders_to_print:
@@ -534,6 +541,7 @@ def print_batch(batch_id):
     return render_template('print.html', orders=orders_to_print)
 
 @app.route('/api/order/<int:order_id>', methods=['GET'])
+@login_required
 def api_order(order_id):
     order = Order.query.get_or_404(order_id)
     return {
@@ -554,6 +562,7 @@ def api_order(order_id):
     }
 
 @app.route('/api/scan', methods=['GET'])
+@login_required
 def api_scan():
     query = request.args.get('q', '').strip()
     if not query:
@@ -581,6 +590,7 @@ def api_scan():
     return {'orders': result}
 
 @app.route('/api/order/<int:order_id>/copy', methods=['POST'])
+@login_required
 def api_order_copy(order_id):
     order = Order.query.get_or_404(order_id)
     order.is_copied = True
@@ -588,6 +598,7 @@ def api_order_copy(order_id):
     return {'success': True}
 
 @app.route('/scan', methods=['POST'])
+@login_required
 def scan():
     tracking_number = request.form.get('tracking_number', '').strip()
     action = request.form.get('action')
@@ -623,6 +634,7 @@ def scan():
     return redirect(url_for('index', tab='scan', scanned=tracking_number))
 
 @app.route('/order/<int:order_id>/delete', methods=['POST'])
+@login_required
 def delete_order(order_id):
     order = Order.query.get_or_404(order_id)
     db.session.delete(order)
@@ -631,6 +643,7 @@ def delete_order(order_id):
     return redirect(url_for('index', tab='orders'))
 
 @app.route('/orders/bulk_action', methods=['POST'])
+@login_required
 def bulk_action():
     action = request.form.get('action')
     order_ids = request.form.getlist('order_ids')
@@ -694,6 +707,7 @@ def bulk_action():
     return redirect(url_for('index', tab='orders'))
 
 @app.route('/order/<int:order_id>/edit', methods=['POST'])
+@login_required
 def edit_order(order_id):
     order = Order.query.get_or_404(order_id)
     order.client_name = request.form.get('client_name', order.client_name)
@@ -749,6 +763,7 @@ def edit_order(order_id):
     return redirect(url_for('index', tab='orders'))
 
 @app.route('/api/reset_db', methods=['POST'])
+@login_required
 def reset_db():
     try:
         # Delete all records from all tables
@@ -765,6 +780,7 @@ def reset_db():
 
 
 @app.route('/accounting/company', methods=['GET', 'POST'])
+@login_required
 def company_accounting():
     companies = Company.query.all()
     selected_company_id = request.args.get('company_id')
@@ -800,7 +816,8 @@ def company_accounting():
             
             # 4. Fetch orders ready to be settled (Delivered, Partial, Returned with shipping)
             # We only settle orders that have reached a final status.
-            orders = Order.query.filter(
+            from sqlalchemy.orm import joinedload
+            orders = Order.query.options(joinedload(Order.courier)).filter(
                 Order.company_id == selected_company.id,
                 Order.company_settled == False,
                 Order.status.in_(['تم التوصيل', 'تسليم جزئي', 'مرتجع بشحن', 'مرتجع شركة'])
@@ -832,6 +849,7 @@ def company_accounting():
     )
 
 @app.route('/api/company/<int:company_id>/pay', methods=['POST'])
+@login_required
 def company_pay(company_id):
     try:
         amount = float(request.form.get('amount', 0))
@@ -858,21 +876,26 @@ def company_pay(company_id):
 # --- Backwards Compatibility Routes for old URLs ---
 
 @app.route('/orders')
+@login_required
 def orders():
     return redirect(url_for('index', tab='orders'))
 
 @app.route('/scan', methods=['GET'])
+@login_required
 def scan_get():
     return redirect(url_for('index', tab='scan'))
 
 @app.route('/upload', methods=['GET'])
+@login_required
 def upload_get():
     return redirect(url_for('index'))
 
 @app.route('/order/new', methods=['GET'])
+@login_required
 def new_order_get():
     return redirect(url_for('index'))
 @app.route('/accounting/courier', methods=['GET', 'POST'])
+@login_required
 def courier_accounting():
     # Fetch all couriers so the user can always find the courier they want
     couriers = Courier.query.all()
@@ -888,8 +911,8 @@ def courier_accounting():
     if selected_courier_id:
         selected_courier = Courier.query.get(selected_courier_id)
         if selected_courier:
-            # Fetch ALL unsettled orders including "مع المندوب"
-            orders = Order.query.filter(
+            from sqlalchemy.orm import joinedload
+            orders = Order.query.options(joinedload(Order.company)).filter(
                 Order.courier_id == selected_courier.id,
                 Order.courier_settled == False
             ).all()
