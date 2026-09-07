@@ -155,10 +155,17 @@ def index():
     # Stats
     total_orders = Order.query.count()
     
-    # Active Goods (Liability)
-    total_goods = db.session.query(db.func.sum(Order.cod - Order.shipping_fee)).filter(
+    # Active Goods (Liability) - Full orders in warehouse/courier
+    full_goods = db.session.query(db.func.sum(Order.cod - Order.shipping_fee)).filter(
         ~Order.status.in_(['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن'])
     ).scalar() or 0.0
+    
+    # Active Goods (Liability) - Remaining parts of partial deliveries
+    partial_goods = db.session.query(db.func.sum(Order.cod - Order.collected_amount)).filter(
+        Order.status == 'تسليم جزئي / مرتجع'
+    ).scalar() or 0.0
+    
+    total_goods = full_goods + partial_goods
     
     # Treasury Cash
     treasury_cash = db.session.query(db.func.sum(TreasuryTransaction.amount)).filter_by(method='كاش').scalar() or 0.0
