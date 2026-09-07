@@ -6,6 +6,7 @@ import hashlib
 from flask import Flask, render_template, request, redirect, url_for, flash
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
+from sqlalchemy.orm import joinedload
 from sqlalchemy import or_, text
 from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -152,35 +153,37 @@ def index():
     active_tab = request.args.get('tab', 'dashboard')
     scanned_tracking = request.args.get('scanned', None)
     
-    # Stats
-    total_orders = Order.query.count()
+    # --- OPTIMIZED QUERIES ---
+    # 1. Fetch all Status counts in ONE query
+    status_counts = db.session.query(Order.status, db.func.count(Order.id)).group_by(Order.status).all()
+    status_dict = dict(status_counts)
     
-    # Active Goods (Liability) - Full orders in warehouse/courier
+    total_orders = sum(status_dict.values())
+    new_in_warehouse = status_dict.get('مخزن', 0)
+    postponed = status_dict.get('مؤجل', 0)
+    returned = status_dict.get('مرتجع', 0)
+    returned_company = status_dict.get('مرتجع شركة', 0)
+    with_courier = status_dict.get('مع المندوب', 0)
+    
+    # 2. Fetch all Treasury sums in ONE query
+    treasury_sums = db.session.query(TreasuryTransaction.method, db.func.sum(TreasuryTransaction.amount)).group_by(TreasuryTransaction.method).all()
+    treasury_dict = dict(treasury_sums)
+    treasury_cash = treasury_dict.get('كاش', 0.0)
+    treasury_transfer = treasury_dict.get('تحويل', 0.0)
+    
+    active_couriers = Courier.query.count()
+    
+    # Active Goods & Profit (Need custom filters, so we keep these separate but they are only 3 queries now)
     full_goods = db.session.query(db.func.sum(Order.cod - Order.shipping_fee)).filter(
         ~Order.status.in_(['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن'])
     ).scalar() or 0.0
     
-    # Active Goods (Liability) - Remaining parts of partial deliveries
     partial_goods = db.session.query(db.func.sum(Order.cod - Order.collected_amount)).filter(
         Order.status == 'تسليم جزئي / مرتجع'
     ).scalar() or 0.0
     
     total_goods = full_goods + partial_goods
     
-    # Treasury Cash
-    treasury_cash = db.session.query(db.func.sum(TreasuryTransaction.amount)).filter_by(method='كاش').scalar() or 0.0
-    
-    # Treasury Transfer
-    treasury_transfer = db.session.query(db.func.sum(TreasuryTransaction.amount)).filter_by(method='تحويل').scalar() or 0.0
-    
-    active_couriers = Courier.query.count()
-    new_in_warehouse = Order.query.filter_by(status='مخزن').count()
-    postponed = Order.query.filter_by(status='مؤجل').count()
-    returned = Order.query.filter_by(status='مرتجع').count()
-    returned_company = Order.query.filter_by(status='مرتجع شركة').count()
-    with_courier = Order.query.filter_by(status='مع المندوب').count()
-    
-    # Net Profit from Delivered Orders
     company_profit = db.session.query(
         db.func.sum(Order.shipping_fee - Order.courier_fee)
     ).filter(
@@ -204,17 +207,11 @@ def index():
     search_query = request.args.get('search', '').strip()
     filter_company = request.args.get('company', '')
     filter_status = request.args.get('status', '')
-    
-    couriers = Courier.query.all()
-    companies = Company.query.all()
-    
-    # All possible statuses in the system
-    statuses = ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع', 'مرتجع شركة']
-    
     filter_courier = request.args.get('courier_id', '')
     filter_region = request.args.get('region', '')
+
     
-    query = Order.query
+    query = Order.query.options(joinedload(Order.company), joinedload(Order.courier))
     
     if search_query:
         query = query.filter(or_(
@@ -254,7 +251,7 @@ def index():
     statuses = [s for s in ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع', 'مرتجع شركة', 'مرتجع بشحن'] if s in db_statuses]
     
     # Active regions in DB based on current filters (excluding region itself)
-    region_query = Order.query
+    region_query = Order.query.options(joinedload(Order.company), joinedload(Order.courier))
     if search_query:
         region_query = region_query.filter(or_(
             Order.tracking_number.contains(search_query),
@@ -803,7 +800,7 @@ def company_accounting():
             
             # 4. Fetch orders ready to be settled (Delivered, Partial, Returned with shipping)
             # We only settle orders that have reached a final status.
-            orders = Order.query.filter(
+            orders = Order.query.options(joinedload(Order.courier)).filter(
                 Order.company_id == selected_company.id,
                 Order.company_settled == False,
                 Order.status.in_(['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن', 'مرتجع شركة'])
@@ -891,10 +888,10 @@ def courier_accounting():
     if selected_courier_id:
         selected_courier = Courier.query.get(selected_courier_id)
         if selected_courier:
-            # Fetch ALL unsettled orders including "مع المندوب"
-            orders = Order.query.filter(
+            # Fetch orders that are NOT settled yet.
+            orders = Order.query.options(joinedload(Order.company)).filter(
                 Order.courier_id == selected_courier.id,
-                Order.courier_settled == False
+                Order.courier_settled == False,
             ).all()
             
             if request.method == 'POST':
