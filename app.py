@@ -232,12 +232,22 @@ def index():
     if filter_region:
         query = query.filter_by(region=filter_region)
         
-    all_orders = query.order_by(Order.id.desc()).all()
+    # Get aggregates efficiently from DB instead of Python loop
+    agg = query.with_entities(
+        db.func.count(Order.id),
+        db.func.sum(Order.cod),
+        db.func.sum(Order.shipping_fee)
+    ).first()
     
-    filtered_orders_count = len(all_orders)
-    filtered_cod = sum(o.cod for o in all_orders if o.cod)
-    filtered_shipping = sum(o.shipping_fee for o in all_orders if o.shipping_fee)
+    filtered_orders_count = agg[0] or 0
+    filtered_cod = agg[1] or 0.0
+    filtered_shipping = agg[2] or 0.0
     filtered_net = filtered_cod - filtered_shipping
+    
+    # Pagination
+    page = request.args.get('page', 1, type=int)
+    pagination = query.order_by(Order.id.desc()).paginate(page=page, per_page=100, error_out=False)
+    all_orders = pagination.items
     
     if search_query or filter_company or filter_status or filter_courier or filter_region:
         active_tab = 'orders' # Force orders tab if filtering
@@ -289,6 +299,7 @@ def index():
                            returned_company=returned_company,
                            with_courier=with_courier,
                            orders=all_orders,
+                           pagination=pagination,
                            search_query=search_query,
                            filter_company=filter_company,
                            filter_status=filter_status,
