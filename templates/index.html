@@ -612,6 +612,18 @@
                 <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body bg-light">
+                <div class="mb-4">
+                    <button class="btn btn-outline-secondary btn-sm w-100 fw-bold" type="button" data-bs-toggle="collapse" data-bs-target="#quickPasteCollapse" aria-expanded="false" aria-controls="quickPasteCollapse">
+                        <i class="fa-solid fa-paste"></i> لصق بيانات الأوردر سريعاً (نسخ ولصق)
+                    </button>
+                </div>
+                <div class="collapse mb-4" id="quickPasteCollapse">
+                    <div class="card card-body border-secondary bg-white">
+                        <label class="form-label fw-bold text-muted small">قم بلصق رسالة العميل (الاسم، الهاتف، العنوان، المنتج، السعر) هنا وسيتم تفريغها أوتوماتيكياً:</label>
+                        <textarea id="quickPasteArea" class="form-control" rows="6" placeholder="العميل: ...&#10;الهاتف: ...&#10;العنوان: ...&#10;المنتج: ...&#10;السعر: ..."></textarea>
+                    </div>
+                </div>
+                
                 <form action="{{ url_for('new_order') }}" method="POST">
                     <div class="mb-3">
                         <label class="form-label fw-bold">الشركة التابع لها (اختر أو اكتب شركة جديدة)</label>
@@ -665,6 +677,52 @@
 </div>
 
 <script>
+    // Quick Paste Parser Logic
+    document.addEventListener('DOMContentLoaded', function() {
+        const pasteArea = document.getElementById('quickPasteArea');
+        if (pasteArea) {
+            pasteArea.addEventListener('input', function(e) {
+                const text = e.target.value;
+                if (!text.trim()) return;
+                
+                // Helper to extract using regex (till end of line)
+                const getMatch = (regex) => {
+                    const match = text.match(regex);
+                    return match ? match[1].trim() : '';
+                };
+                
+                // Matches "العميل: Sahar Ahmed"
+                const client = getMatch(/(?:العميل|الاسم|اسم العميل)[\s:\-]*([^\n]+)/i);
+                if (client) document.querySelector('#newOrderModal input[name="client_name"]').value = client;
+                
+                // Matches "الهاتف: 01223272833"
+                const phone = getMatch(/(?:الهاتف|الموبايل|رقم|تليفون|ت)[\s:\-]*([^\n]+)/i);
+                if (phone) document.querySelector('#newOrderModal input[name="phone"]').value = phone;
+                
+                // Matches "العنوان: الجيزة - شارع جمال..."
+                const address = getMatch(/(?:العنوان)[\s:\-]*([^\n]+)/i);
+                if (address) {
+                    document.querySelector('#newOrderModal textarea[name="address"]').value = address;
+                    
+                    // Try to guess region from address if region is empty
+                    const regionInput = document.querySelector('#newOrderModal input[name="region"]');
+                    if (!regionInput.value) {
+                        const firstPart = address.split(/[-،,]/)[0].trim();
+                        if (firstPart) regionInput.value = firstPart;
+                    }
+                }
+                
+                // Matches "المنتج: lady fashion — مقاس 2..."
+                const product = getMatch(/(?:المنتج|المحتوى|تفاصيل|الاوردر)[\s:\-]*([^\n]+)/i);
+                if (product) document.querySelector('#newOrderModal textarea[name="content"]').value = product;
+                
+                // Matches "السعر: 570 يضيفه هو" - extract the first number after the keyword
+                const priceMatch = text.match(/(?:السعر|المبلغ|التحصيل|cod|الحساب)[\s:\-]*.*?(\d+)/i);
+                if (priceMatch) document.querySelector('#newOrderModal input[name="cod"]').value = priceMatch[1];
+            });
+        }
+    });
+
     // Scanner focus logic
     document.addEventListener('DOMContentLoaded', function() {
         const scanTabButton = document.getElementById('scan-tab');
