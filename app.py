@@ -157,7 +157,7 @@ def index():
     
     # Active Goods (Liability)
     total_goods = db.session.query(db.func.sum(Order.cod - Order.shipping_fee)).filter(
-        ~Order.status.in_(['تم التوصيل', 'تسليم جزئي', 'مرتجع شركة', 'مرتجع بشحن'])
+        ~Order.status.in_(['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن'])
     ).scalar() or 0.0
     
     # Treasury Cash
@@ -177,7 +177,7 @@ def index():
     company_profit = db.session.query(
         db.func.sum(Order.shipping_fee - Order.courier_fee)
     ).filter(
-        Order.status.in_(['تم التوصيل', 'تسليم جزئي', 'مرتجع بشحن'])
+        Order.status.in_(['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن'])
     ).scalar() or 0.0
     
     # Advanced Dashboard Stats
@@ -202,7 +202,7 @@ def index():
     companies = Company.query.all()
     
     # All possible statuses in the system
-    statuses = ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي', 'مرتجع', 'مرتجع شركة']
+    statuses = ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع', 'مرتجع شركة']
     
     filter_courier = request.args.get('courier_id', '')
     filter_region = request.args.get('region', '')
@@ -244,7 +244,7 @@ def index():
     
     # Active statuses in DB
     db_statuses = [r[0] for r in db.session.query(Order.status).distinct().all()]
-    statuses = [s for s in ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي', 'مرتجع', 'مرتجع شركة', 'مرتجع بشحن'] if s in db_statuses]
+    statuses = [s for s in ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع', 'مرتجع شركة', 'مرتجع بشحن'] if s in db_statuses]
     
     # Active regions in DB based on current filters (excluding region itself)
     region_query = Order.query
@@ -803,7 +803,7 @@ def company_accounting():
             orders = Order.query.filter(
                 Order.company_id == selected_company.id,
                 Order.company_settled == False,
-                Order.status.in_(['تم التوصيل', 'تسليم جزئي', 'مرتجع بشحن', 'مرتجع شركة'])
+                Order.status.in_(['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن', 'مرتجع شركة'])
             ).all()
             
             if request.method == 'POST':
@@ -911,7 +911,7 @@ def courier_accounting():
                         if new_status and new_status != 'مع المندوب' and new_status != 'مؤجل':
                             order.status = new_status
                             
-                            if new_status in ['تم التوصيل', 'تسليم جزئي', 'مرتجع بشحن']:
+                            if new_status in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
                                 try:
                                     order.collected_amount = float(request.form.get(f'collected_{order.id}', 0))
                                 except:
