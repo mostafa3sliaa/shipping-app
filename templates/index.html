@@ -703,13 +703,6 @@
                 const address = getMatch(/(?:العنوان)[\s:\-]*([^\n]+)/i);
                 if (address) {
                     document.querySelector('#newOrderModal textarea[name="address"]').value = address;
-                    
-                    // Try to guess region from address if region is empty
-                    const regionInput = document.querySelector('#newOrderModal input[name="region"]');
-                    if (!regionInput.value) {
-                        const firstPart = address.split(/[-،,]/)[0].trim();
-                        if (firstPart) regionInput.value = firstPart;
-                    }
                 }
                 
                 // Matches "المنتج: lady fashion — مقاس 2..."
