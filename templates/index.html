@@ -198,22 +198,34 @@
     <div class="tab-pane fade {% if active_tab == 'orders' %}show active{% endif %}" id="orders" role="tabpanel" aria-labelledby="orders-tab">
         
         <!-- Filter Summary Boxes -->
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <div>
-                <button type="button" class="btn btn-outline-primary shadow-sm me-2 fw-bold" data-bs-toggle="modal" data-bs-target="#newOrderModal">
-                    <i class="fa-solid fa-plus me-1"></i> إضافة أوردر يدوي
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
+            <div class="d-flex gap-2">
+                <button type="button" class="btn btn-outline-primary shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#newOrderModal">
+                    <i class="fa-solid fa-plus me-1"></i> يدوي
                 </button>
                 <button type="button" class="btn btn-success shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#uploadModal">
-                    <i class="fa-solid fa-cloud-arrow-up me-2"></i> استيراد شيت إكسيل
+                    <i class="fa-solid fa-cloud-arrow-up me-1"></i> إكسيل
                 </button>
             </div>
-            <div class="card bg-primary text-white border-0 shadow-sm rounded-4" style="min-width: 220px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
-                <div class="card-body d-flex justify-content-between align-items-center py-2 px-4">
-                    <div>
-                        <h6 class="mb-0 fw-bold text-white-50">عدد الأوردرات</h6>
-                        <h3 class="mb-0 fw-bold">{{ filtered_orders_count }}</h3>
+            
+            <div class="flex-grow-1 mx-lg-3" style="max-width: 600px;">
+                <form id="inlineScannerForm" onsubmit="handleInlineScan(event)" class="m-0 position-relative">
+                    <div class="input-group input-group-lg shadow-sm">
+                        <span class="input-group-text bg-warning border-warning"><i class="fa-solid fa-barcode fa-lg"></i></span>
+                        <input type="text" id="inline_tracking_number" class="form-control border-warning fw-bold text-center" placeholder="امسح الباركود، التليفون، أو الاسم..." autofocus autocomplete="off">
+                        <button class="btn btn-warning fw-bold px-4 border-warning" type="submit">فحص</button>
                     </div>
-                    <i class="fa-solid fa-boxes-stacked fa-2x text-white opacity-50 ms-3"></i>
+                    <div id="inlineScanFeedback" class="text-danger fw-bold small ms-2 mt-1 position-absolute"></div>
+                </form>
+            </div>
+
+            <div class="card bg-primary text-white border-0 shadow-sm rounded-4 d-none d-lg-block" style="min-width: 150px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
+                <div class="card-body d-flex justify-content-between align-items-center py-2 px-3">
+                    <div>
+                        <h6 class="mb-0 fw-bold text-white-50" style="font-size: 0.8rem;">إجمالي الأوردرات</h6>
+                        <h4 class="mb-0 fw-bold">{{ filtered_orders_count }}</h4>
+                    </div>
+                    <i class="fa-solid fa-boxes-stacked fa-2x text-white opacity-50 ms-2"></i>
                 </div>
             </div>
         </div>
@@ -277,17 +289,6 @@
             </div>
         </div>
 
-
-        <div class="mb-3">
-            <form id="inlineScannerForm" onsubmit="handleInlineScan(event)">
-                <div class="input-group input-group-lg shadow-sm mb-2">
-                    <span class="input-group-text bg-warning border-warning"><i class="fa-solid fa-barcode fa-lg"></i></span>
-                    <input type="text" id="inline_tracking_number" class="form-control border-warning fw-bold text-center" placeholder="امسح الباركود أو اكتب التليفون / الاسم ثم اضغط Enter..." autofocus autocomplete="off">
-                    <button class="btn btn-warning fw-bold px-4 border-warning" type="submit">فحص السجل</button>
-                </div>
-                <div id="inlineScanFeedback" class="text-danger fw-bold small ms-2"></div>
-            </form>
-        </div>
 
         <form action="{{ url_for('bulk_action') }}" method="POST" id="bulkForm">
             <div class="mb-2 d-flex justify-content-between align-items-center bg-light p-3 rounded border shadow-sm">
