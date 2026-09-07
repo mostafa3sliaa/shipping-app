@@ -767,8 +767,38 @@
             let addedAny = false;
             
             orders.forEach(order => {
-                const tr = document.getElementById(`order-row-${order.id}`);
-                const checkbox = document.getElementById(`checkbox-${order.id}`);
+                let tr = document.getElementById(`order-row-${order.id}`);
+                let checkbox = document.getElementById(`checkbox-${order.id}`);
+                
+                // If row doesn't exist on current page, create a temporary one so it can be bulk processed
+                if (!tr) {
+                    // Remove "No orders" message if present
+                    const noOrdersRow = tbody.querySelector('td[colspan="9"]');
+                    if (noOrdersRow) noOrdersRow.parentElement.remove();
+                    
+                    tr = document.createElement('tr');
+                    tr.id = `order-row-${order.id}`;
+                    tr.className = 'bg-white';
+                    tr.innerHTML = `
+                        <td class="px-3">
+                            <input class="form-check-input order-checkbox" type="checkbox" name="order_ids" value="${order.id}" id="checkbox-${order.id}">
+                        </td>
+                        <td class="px-2 fw-bold text-primary">${order.tracking_number}</td>
+                        <td><small class="text-warning fw-bold"><i class="fa-solid fa-bolt"></i> باركود</small></td>
+                        <td>-</td>
+                        <td>
+                            <div class="fw-bold">${order.client_name || ''}</div>
+                            <small class="text-muted"><i class="fa-solid fa-phone fa-sm"></i> ${order.phone || ''}</small>
+                        </td>
+                        <td><div class="text-wrap" style="max-width: 250px; font-size: 0.9rem;">${order.region || ''}</div></td>
+                        <td>-</td>
+                        <td class="fw-bold text-success">${order.cod || 0}</td>
+                        <td>-</td>
+                        <td><span class="badge bg-dark">${order.status || ''}</span></td>
+                        <td class="text-center">-</td>
+                    `;
+                    checkbox = tr.querySelector('.order-checkbox');
+                }
                 
                 if (tr && checkbox) {
                     addedAny = true;
@@ -788,7 +818,7 @@
             });
             
             if (!addedAny) {
-                feedbackElement.innerText = 'هذا الأوردر غير موجود في الصفحة الحالية (أو تم مسحه)';
+                feedbackElement.innerText = 'حدث خطأ غير متوقع في معالجة الأوردر';
             }
             
         } catch (error) {
