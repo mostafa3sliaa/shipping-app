@@ -363,18 +363,14 @@ def upload_file():
         flash('لم يتم اختيار ملف', 'danger')
         return redirect(url_for('index'))
     if file and (file.filename.endswith('.xlsx') or file.filename.endswith('.xls')):
-        filename = secure_filename(file.filename)
-        filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        file.save(filepath)
-        
         company_name_input = request.form.get('company_name', '').strip()
         if not company_name_input:
             flash('يجب كتابة اسم الشركة!', 'danger')
             return redirect(url_for('index'))
             
         try:
-            # Read without headers to scan the entire matrix
-            df = pd.read_excel(filepath, header=None)
+            # Read directly from the file stream (works on serverless like Vercel)
+            df = pd.read_excel(file, header=None)
             success_count = 0
             
             def normalize_arabic(text):
