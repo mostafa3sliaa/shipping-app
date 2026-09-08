@@ -200,7 +200,15 @@
         
         <!-- Treasury Manual Deposit History -->
         <div class="card shadow-sm border-0 mb-4 bg-light">
-            <div class="card-header bg-white fw-bold"><i class="fa-solid fa-clock-rotate-left text-secondary me-2"></i> سجل الإيداعات اليدوية (الخزينة والمحفظة)</div>
+            <div class="card-header bg-white fw-bold d-flex flex-wrap justify-content-between align-items-center py-2">
+                <div class="mb-2 mb-md-0"><i class="fa-solid fa-clock-rotate-left text-secondary me-2"></i> سجل الإيداعات اليدوية (الخزينة والمحفظة)</div>
+                <div style="max-width: 300px; width: 100%;">
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-light"><i class="fa-solid fa-search"></i></span>
+                        <input type="text" id="depositSearch" class="form-control border-secondary" placeholder="بحث بالتاريخ (مثال: 9-8 أو 2026-09)..." onkeyup="filterDeposits()">
+                    </div>
+                </div>
+            </div>
             <div class="card-body p-0">
                 <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
                     <table class="table table-hover mb-0">
@@ -212,9 +220,9 @@
                                 <th>ملاحظات</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody id="depositTableBody">
                             {% for tx in deposit_history %}
-                            <tr>
+                            <tr class="deposit-row">
                                 <td><small class="text-muted">{{ tx.created_at.strftime('%Y-%m-%d %I:%M %p') }}</small></td>
                                 <td class="text-success fw-bold">+ {{ "{:,.2f}".format(tx.amount) }}</td>
                                 <td><span class="badge bg-{{ 'success' if tx.method == 'كاش' else 'primary' }}">{{ tx.method }}</span></td>
@@ -880,6 +888,32 @@
         rows.forEach(row => {
             const text = row.innerText.toLowerCase();
             if (text.includes(input)) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    // === Deposit History Filter ===
+    function filterDeposits() {
+        let query = document.getElementById('depositSearch').value.toLowerCase().trim();
+        // Allow user to type "8/2" -> "8-2"
+        query = query.replace(/\//g, '-');
+        // Remove leading zeros from query (e.g. "08-02" -> "8-2", or "9-08" -> "9-8")
+        query = query.replace(/(^|-)0+/g, '$1');
+        
+        const rows = document.querySelectorAll('#depositTableBody tr.deposit-row');
+        
+        rows.forEach(row => {
+            let dateText = row.children[0].innerText.toLowerCase();
+            // Remove leading zeros from table date (e.g. "2026-09-08" -> "2026-9-8")
+            dateText = dateText.replace(/(^|-)0+/g, '$1');
+            
+            const notesText = row.children[3].innerText.toLowerCase();
+            
+            // Search in date or notes
+            if (dateText.includes(query) || notesText.includes(query)) {
                 row.style.display = '';
             } else {
                 row.style.display = 'none';
