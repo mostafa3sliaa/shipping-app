@@ -54,13 +54,13 @@ class Company(db.Model):
 class Courier(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), unique=True, nullable=False)
-    phone = db.Column(db.String(20))
+    phone = db.Column(db.String(150))
 
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     tracking_number = db.Column(db.String(50), unique=True, nullable=False)
     client_name = db.Column(db.String(100))
-    phone = db.Column(db.String(20))
+    phone = db.Column(db.String(150))
     address = db.Column(db.String(255))
     region = db.Column(db.String(100))
     cod = db.Column(db.Float, default=0.0)
@@ -94,6 +94,13 @@ class TreasuryTransaction(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 with app.app_context():
+    try:
+        db.session.execute(text('ALTER TABLE "order" ALTER COLUMN phone TYPE VARCHAR(150);'))
+        db.session.execute(text('ALTER TABLE courier ALTER COLUMN phone TYPE VARCHAR(150);'))
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        pass
 
     db.create_all()
     
