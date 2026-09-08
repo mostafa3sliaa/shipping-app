@@ -843,8 +843,13 @@
                     // Move row to the top
                     tbody.prepend(tr);
                     
-                    // Check the checkbox
-                    checkbox.checked = true;
+                    // Check the checkbox ONLY IF there is exactly one result.
+                    if (orders.length === 1) {
+                        checkbox.checked = true;
+                    } else {
+                        // Uncheck it in case it was checked, so they have to manually choose
+                        checkbox.checked = false;
+                    }
                     
                     // Highlight the row temporarily
                     const originalBg = tr.className;
@@ -855,7 +860,10 @@
                 }
             });
             
-            if (!addedAny) {
+            if (orders.length > 1) {
+                feedbackElement.className = 'text-primary fw-bold small ms-2 mt-1 position-absolute';
+                feedbackElement.innerText = `تنبيه: تم العثور على ${orders.length} أوردرات لنفس الرقم. تم نقلهم لأعلى القائمة لتختار منهم.`;
+            } else if (!addedAny) {
                 feedbackElement.innerText = 'حدث خطأ غير متوقع في معالجة الأوردر';
             }
             
