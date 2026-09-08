@@ -908,7 +908,7 @@ def company_accounting():
             # Wait, if an order is returned with shipping fee, we collected shipping fee from customer, 
             # so the company owes US the shipping fee, or we take it from the collected amount.
             # Usually: Net = Collected_Amount - Shipping_Fee
-            company_debt = db.session.query(
+            order_profits = db.session.query(
                 db.func.sum(Order.collected_amount - Order.shipping_fee)
             ).filter_by(company_id=selected_company.id, company_settled=True).scalar() or 0.0
             
@@ -917,7 +917,7 @@ def company_accounting():
                 db.func.sum(TreasuryTransaction.amount)
             ).filter_by(tx_type='إضافة_رصيد_لشركة', entity_id=selected_company.id).scalar() or 0.0
             
-            company_debt += manual_debt
+            company_debt = order_profits + manual_debt
             
             # 2. Total Paid to Company (Negative transactions in Treasury)
             # When we pay the company, we insert a negative amount into TreasuryTransaction
@@ -966,6 +966,8 @@ def company_accounting():
         selected_company=selected_company, 
         orders=orders,
         company_debt=company_debt,
+        order_profits=order_profits if 'order_profits' in locals() else 0.0,
+        manual_debt=manual_debt if 'manual_debt' in locals() else 0.0,
         company_paid=company_paid,
         company_balance=company_balance,
         transactions=transactions if 'transactions' in locals() else []
