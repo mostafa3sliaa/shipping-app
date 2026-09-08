@@ -285,6 +285,11 @@ def index():
         
         if not scanned_orders:
             flash('لا يوجد أوردر مطابق للبحث!', 'danger')
+            
+    # Fetch manual deposit history
+    deposit_history = TreasuryTransaction.query.filter_by(
+        tx_type='إيداع_يدوي'
+    ).order_by(TreasuryTransaction.created_at.desc()).all()
     
     return render_template('index.html', 
                            total_orders=total_orders, 
@@ -316,7 +321,8 @@ def index():
                            statuses=statuses,
                            active_tab=active_tab,
                            scanned_orders=scanned_orders,
-                           scanned_query=scanned_tracking)
+                           scanned_query=scanned_tracking,
+                           deposit_history=deposit_history)
 
 @app.route('/order/new', methods=['POST'])
 def new_order():
