@@ -94,7 +94,7 @@
                             </thead>
                             <tbody>
                                 {% for order in orders %}
-                                <tr id="row_{{ order.id }}" class="bg-light">
+                                <tr id="row_{{ order.id }}" class="bg-light" data-phone="{{ order.phone }}" data-address="{{ order.address }}" data-content="{{ order.content }}">
                                     <td class="fw-bold font-monospace text-primary">{{ order.tracking_number }}</td>
                                     <td>{{ order.client_name }}</td>
                                     <td class="fw-bold" id="cod_{{ order.id }}" data-val="{{ order.cod }}">{{ order.cod }}</td>
@@ -280,11 +280,11 @@
                             const tracking = row.children[0].innerText.trim();
                             const client = row.children[1].innerText.trim();
                             const cod = row.children[2].innerText.trim();
-                            // Status is the selected option text
-                            const statusSelect = row.querySelector('.status-select');
-                            const status = statusSelect ? statusSelect.options[statusSelect.selectedIndex].text : '';
+                            const phone = row.getAttribute('data-phone') || '';
+                            const address = row.getAttribute('data-address') || '';
+                            const content = row.getAttribute('data-content') || '';
                             
-                            text += `📌 بوليصة: ${tracking}\n👤 العميل: ${client}\n💰 المطلوب: ${cod} ج.م\n`;
+                            text += `📌 بوليصة: ${tracking}\nالعميل: ${client}\nالهاتف: ${phone}\nالعنوان: ${address}\nالمنتج: ${content}\nالسعر: ${cod}\n`;
                             text += "------------------------\n";
                             count++;
                         });
