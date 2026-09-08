@@ -209,9 +209,13 @@ def index():
     filter_status = request.args.get('status', '')
     filter_courier = request.args.get('courier_id', '')
     filter_region = request.args.get('region', '')
+    filter_duplicates = request.args.get('duplicates', '')
 
-    
     query = Order.query.options(joinedload(Order.company), joinedload(Order.courier))
+    
+    # Calculate duplicate phones globally
+    duplicate_phones_query = db.session.query(Order.phone).group_by(Order.phone).having(db.func.count(Order.id) > 1).all()
+    duplicate_phones = set([r[0] for r in duplicate_phones_query if r[0]])
     
     if search_query:
         query = query.filter(or_(
@@ -231,6 +235,9 @@ def index():
         
     if filter_region:
         query = query.filter_by(region=filter_region)
+        
+    if filter_duplicates == '1' and duplicate_phones:
+        query = query.filter(Order.phone.in_(list(duplicate_phones)))
         
     # Get aggregates efficiently from DB instead of Python loop
     agg = query.with_entities(
@@ -310,6 +317,7 @@ def index():
                            filter_status=filter_status,
                            filter_courier=filter_courier,
                            filter_region=filter_region,
+                           filter_duplicates=filter_duplicates,
                            regions=regions,
                            filtered_orders_count=filtered_orders_count,
                            filtered_cod=filtered_cod,
@@ -322,7 +330,8 @@ def index():
                            active_tab=active_tab,
                            scanned_orders=scanned_orders,
                            scanned_query=scanned_tracking,
-                           deposit_history=deposit_history)
+                           deposit_history=deposit_history,
+                           duplicate_phones=duplicate_phones)
 
 @app.route('/order/new', methods=['POST'])
 def new_order():

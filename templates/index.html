@@ -322,6 +322,13 @@
                             {% endfor %}
                         </select>
                     </div>
+
+                    <div class="col-md-1 d-flex align-items-center justify-content-center">
+                        <div class="form-check form-switch mt-1">
+                            <input class="form-check-input" type="checkbox" role="switch" id="duplicateFilter" name="duplicates" value="1" onchange="this.form.submit()" {% if filter_duplicates == '1' %}checked{% endif %}>
+                            <label class="form-check-label fw-bold text-danger ms-1" for="duplicateFilter" style="font-size: 0.85rem;" title="عرض الأرقام المكررة فقط">مكرر</label>
+                        </div>
+                    </div>
                     
                     <div class="col-md-1 d-flex gap-2">
                         {% if search_query or filter_company or filter_status or filter_courier or filter_region %}
@@ -412,7 +419,7 @@
                             </thead>
                             <tbody>
                                 {% for order in orders %}
-                                <tr id="order-row-{{ order.id }}" class="{% if order.is_copied %}bg-success bg-opacity-25{% else %}bg-white{% endif %}">
+                                <tr id="order-row-{{ order.id }}" class="{% if order.is_copied %}bg-success bg-opacity-25{% elif order.phone in duplicate_phones %}bg-danger bg-opacity-10 border-danger border-2{% else %}bg-white{% endif %}">
                                     <td class="px-3">
                                         <input class="form-check-input order-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}" id="checkbox-{{ order.id }}">
                                     </td>
@@ -432,7 +439,10 @@
                                     </td>
                                     <td>
                                         <div class="fw-bold">{{ order.client_name }}</div>
-                                        <small class="text-muted"><i class="fa-solid fa-phone fa-sm"></i> {{ order.phone }}</small>
+                                        <small class="{% if order.phone in duplicate_phones %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                                            <i class="fa-solid fa-phone fa-sm"></i> {{ order.phone }}
+                                            {% if order.phone in duplicate_phones %}<i class="fa-solid fa-triangle-exclamation ms-1" title="رقم مكرر"></i>{% endif %}
+                                        </small>
                                     </td>
                                     <td>
                                         <div class="text-wrap" style="max-width: 250px; font-size: 0.9rem;">{{ order.address }}</div>
