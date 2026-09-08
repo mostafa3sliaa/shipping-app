@@ -735,7 +735,7 @@
 
 <script>
     // Quick Paste Parser Logic
-    document.addEventListener('turbo:load', function() {
+    (function() {
         const pasteArea = document.getElementById('quickPasteArea');
         if (pasteArea) {
             pasteArea.addEventListener('input', function(e) {
@@ -771,10 +771,10 @@
                 if (priceMatch) document.querySelector('#newOrderModal input[name="cod"]').value = priceMatch[1];
             });
         }
-    });
+    })();
 
     // Scanner focus logic
-    document.addEventListener('turbo:load', function() {
+    (function() {
         const scanTabButton = document.getElementById('scan-tab');
         const scanInput = document.getElementById('ajax_tracking_number');
         
@@ -796,7 +796,7 @@
                 });
             {% endif %}
         }
-    });
+    })();
 
     // Inline Scanner Logic in Orders Tab
     async function handleInlineScan(event) {

@@ -264,13 +264,13 @@
                     }
 
                     // Run on load
-                    document.addEventListener('turbo:load', () => {
+                    (function() {
                         const selects = document.querySelectorAll('.status-select');
                         selects.forEach(select => {
                             const id = select.id.split('_')[1];
                             updateRow(id);
                         });
-                    });
+                    })();
                     
                     function copyWhatsAppMessage() {
                         let text = "*شيت شغل المندوب*\n\n";
