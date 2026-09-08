@@ -94,7 +94,7 @@
                             </thead>
                             <tbody>
                                 {% for order in orders %}
-                                <tr id="row_{{ order.id }}" class="bg-light" data-phone="{{ order.phone }}" data-address="{{ order.address }}" data-content="{{ order.content }}">
+                                <tr id="row_{{ order.id }}" class="bg-light" data-phone="{{ order.phone }}" data-address="{{ order.address }}" data-content="{{ order.content }}" data-shipping="{{ order.shipping_fee or 0 }}">
                                     <td class="fw-bold font-monospace text-primary">{{ order.tracking_number }}</td>
                                     <td>{{ order.client_name }}</td>
                                     <td class="fw-bold" id="cod_{{ order.id }}" data-val="{{ order.cod }}">{{ order.cod }}</td>
@@ -110,7 +110,7 @@
                                     </td>
                                     <td>
                                         <div class="input-group input-group-sm">
-                                            <input type="number" step="0.01" name="collected_{{ order.id }}" id="collected_{{ order.id }}" class="form-control text-success fw-bold" value="0" oninput="updateRow('{{ order.id }}', true)" readonly>
+                                            <input type="number" step="0.01" name="collected_{{ order.id }}" id="collected_{{ order.id }}" class="form-control text-success fw-bold" value="{{ order.collected_amount if order.collected_amount is not none else '0' }}" oninput="updateRow('{{ order.id }}', true)" readonly>
                                         </div>
                                     </td>
                                     <td>
@@ -198,6 +198,7 @@
                         const collectedInput = document.getElementById('collected_' + id);
                         const feeInput = document.getElementById('courier_fee_' + id);
                         const row = document.getElementById('row_' + id);
+                        const shipping = parseFloat(row.getAttribute('data-shipping')) || 0;
                         
                         if (status === 'مع المندوب' || status === 'مؤجل') {
                             collectedInput.value = "0";
@@ -206,11 +207,12 @@
                             row.classList.remove('table-success', 'table-warning', 'table-danger');
                             row.classList.add('bg-light');
                         } else if (status === 'تم التوصيل') {
-                            if (!manualCollected) collectedInput.value = cod;
+                            if (!manualCollected && collectedInput.value == "0") collectedInput.value = cod;
                             collectedInput.readOnly = false;
                             row.classList.remove('bg-light', 'table-warning', 'table-danger');
                             row.classList.add('table-success');
                         } else if (status === 'تسليم جزئي / مرتجع') {
+                            if (!manualCollected && collectedInput.value == "0") collectedInput.value = cod;
                             collectedInput.readOnly = false;
                             row.classList.remove('bg-light', 'table-success', 'table-danger');
                             row.classList.add('table-warning');
@@ -220,6 +222,7 @@
                             row.classList.remove('bg-light', 'table-success', 'table-warning');
                             row.classList.add('table-danger');
                         } else if (status === 'مرتجع بشحن') {
+                            if (!manualCollected && collectedInput.value == "0") collectedInput.value = shipping;
                             collectedInput.readOnly = false;
                             row.classList.remove('bg-light', 'table-success', 'table-danger');
                             row.classList.add('table-warning');
