@@ -370,6 +370,11 @@ def export_excel():
     
     data = []
     for o in orders:
+        # Use collected_amount if present (partial delivery), otherwise cod
+        total_cod = o.collected_amount if o.collected_amount is not None else o.cod
+        shipping = o.shipping_fee or 0
+        net = total_cod - shipping
+        
         data.append({
             'رقم البوليصة': o.tracking_number,
             'العميل': o.client_name,
@@ -378,15 +383,33 @@ def export_excel():
             'العنوان': o.address,
             'الشركة': o.company.name if o.company else '',
             'المندوب': o.courier.name if o.courier else '',
-            'مبلغ التحصيل (COD)': o.cod,
-            'رسوم الشحن': o.shipping_fee,
-            'المبلغ المحصل فعلياً': o.collected_amount,
-            'عمولة المندوب': o.courier_fee,
+            'الإجمالي': total_cod,
+            'الشحن': shipping,
+            'الصافي': net,
+            'عمولة المندوب': o.courier_fee or 0,
             'الحالة': o.status,
             'التاريخ': o.created_at.strftime('%Y-%m-%d') if o.created_at else ''
         })
         
     df = pd.DataFrame(data)
+    
+    if not df.empty:
+        totals = {
+            'رقم البوليصة': 'الإجمالي الكلي',
+            'العميل': '',
+            'رقم التليفون': '',
+            'المنطقة': '',
+            'العنوان': '',
+            'الشركة': '',
+            'المندوب': '',
+            'الإجمالي': df['الإجمالي'].sum(),
+            'الشحن': df['الشحن'].sum(),
+            'الصافي': df['الصافي'].sum(),
+            'عمولة المندوب': df['عمولة المندوب'].sum(),
+            'الحالة': '',
+            'التاريخ': ''
+        }
+        df = pd.concat([df, pd.DataFrame([totals])], ignore_index=True)
     
     output = BytesIO()
     # use ExcelWriter
@@ -1061,6 +1084,20 @@ def export_courier_excel(courier_id):
         })
         
     df = pd.DataFrame(data)
+    
+    if not df.empty:
+        totals = {
+            'رقم البوليصة': 'الإجمالي',
+            'العميل': '',
+            'رقم التليفون': '',
+            'المنطقة': '',
+            'العنوان': '',
+            'مبلغ التحصيل (COD)': df['مبلغ التحصيل (COD)'].sum(),
+            'الحالة': '',
+            'الشركة': '',
+            'المحتوى': ''
+        }
+        df = pd.concat([df, pd.DataFrame([totals])], ignore_index=True)
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Orders')
