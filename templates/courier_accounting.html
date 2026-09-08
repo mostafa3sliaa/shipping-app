@@ -62,10 +62,13 @@
                     <input type="hidden" name="action" value="settle">
                     
                     <div class="row mb-3 align-items-center">
-                        <div class="col-md-6">
+                        <div class="col-md-4">
                             <h5 class="fw-bold mb-0 text-primary">أوردرات المندوب (المفتوحة)</h5>
                         </div>
-                        <div class="col-md-6 text-end">
+                        <div class="col-md-8 text-end">
+                            <a href="{{ url_for('export_courier_excel', courier_id=selected_courier.id) }}" class="btn btn-sm btn-outline-success fw-bold me-1"><i class="fa-solid fa-file-excel"></i> إكسيل</a>
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold me-3" onclick="copyWhatsAppMessage()"><i class="fa-brands fa-whatsapp"></i> واتس</button>
+                            
                             <div class="d-inline-flex align-items-center bg-white border border-primary p-2 rounded shadow-sm">
                                 <label class="fw-bold me-2 text-primary mb-0">توحيد عمولة المندوب:</label>
                                 <div class="input-group input-group-sm" style="width: 150px;">
@@ -268,6 +271,31 @@
                             updateRow(id);
                         });
                     });
+                    
+                    function copyWhatsAppMessage() {
+                        let text = "*شيت شغل المندوب*\n\n";
+                        let count = 0;
+                        const rows = document.querySelectorAll('tbody tr');
+                        rows.forEach(row => {
+                            const tracking = row.children[0].innerText.trim();
+                            const client = row.children[1].innerText.trim();
+                            const cod = row.children[2].innerText.trim();
+                            // Status is the selected option text
+                            const statusSelect = row.querySelector('.status-select');
+                            const status = statusSelect ? statusSelect.options[statusSelect.selectedIndex].text : '';
+                            
+                            text += `📌 بوليصة: ${tracking}\n👤 العميل: ${client}\n💰 المطلوب: ${cod} ج.م\n`;
+                            text += "------------------------\n";
+                            count++;
+                        });
+                        text += `\n📦 إجمالي عدد الأوردرات: ${count}`;
+                        
+                        navigator.clipboard.writeText(text).then(() => {
+                            alert('تم نسخ رسالة الواتساب بنجاح! يمكنك لصقها الآن للمندوب.');
+                        }).catch(err => {
+                            alert('حدث خطأ أثناء النسخ.');
+                        });
+                    }
                 </script>
 
             {% else %}

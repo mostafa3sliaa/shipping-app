@@ -1002,6 +1002,46 @@ def upload_get():
 @app.route('/order/new', methods=['GET'])
 def new_order_get():
     return redirect(url_for('index'))
+
+@app.route('/export_excel/courier/<int:courier_id>', methods=['GET'])
+@login_required
+def export_courier_excel(courier_id):
+    courier = Courier.query.get_or_404(courier_id)
+    orders = Order.query.filter(
+        Order.courier_id == courier_id,
+        Order.courier_settled == False
+    ).order_by(Order.id.desc()).all()
+    
+    data = []
+    for o in orders:
+        data.append({
+            'رقم البوليصة': o.tracking_number,
+            'العميل': o.client_name,
+            'رقم التليفون': o.phone,
+            'المنطقة': o.region,
+            'العنوان': o.address,
+            'مبلغ التحصيل (COD)': o.cod,
+            'الحالة': o.status,
+            'الشركة': o.company.name if o.company else '',
+            'المحتوى': o.content
+        })
+        
+    df = pd.DataFrame(data)
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Orders')
+        
+    output.seek(0)
+    timestamp = datetime.now().strftime("%Y%m%d")
+    filename = f"courier_{courier.name}_{timestamp}.xlsx"
+    
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
 @app.route('/accounting/courier', methods=['GET', 'POST'])
 def courier_accounting():
     # Fetch all couriers so the user can always find the courier they want
