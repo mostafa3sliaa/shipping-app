@@ -249,7 +249,7 @@
                     <i class="fa-solid fa-plus me-1"></i> يدوي
                 </button>
                 <button type="button" class="btn btn-success shadow-sm fw-bold" data-bs-toggle="modal" data-bs-target="#uploadModal">
-                    <i class="fa-solid fa-cloud-arrow-up me-1"></i> إكسيل
+                    <i class="fa-solid fa-cloud-arrow-up me-1"></i> رفع إكسيل
                 </button>
             </div>
             
@@ -331,7 +331,7 @@
                     </div>
                     
                     <div class="col d-flex gap-2 justify-content-end">
-                        <button type="submit" formaction="{{ url_for('export_excel') }}" class="btn btn-outline-success w-100 fw-bold" style="max-width: 120px;" title="تحميل الإكسيل للنتائج الحالية"><i class="fa-solid fa-file-excel"></i> إكسيل</button>
+                        <button type="submit" formaction="{{ url_for('export_excel') }}" class="btn btn-outline-success w-100 fw-bold" style="max-width: 140px;" title="تحميل الإكسيل للنتائج الحالية"><i class="fa-solid fa-file-excel"></i> استخراج إكسيل</button>
                         {% if search_query or filter_company or filter_status or filter_courier or filter_region or filter_duplicates %}
                         <a href="{{ url_for('index', tab='orders') }}" class="btn btn-outline-danger fw-bold flex-shrink-0" title="إلغاء الفلاتر"><i class="fa-solid fa-times"></i></a>
                         {% endif %}
