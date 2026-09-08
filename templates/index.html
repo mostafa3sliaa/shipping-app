@@ -418,7 +418,7 @@
                                     <th class="py-3 text-center"><i class="fa-solid fa-gear me-1"></i> إجراء</th>
                                 </tr>
                             </thead>
-                            <tbody>
+                            <tbody id="orders-tbody">
                                 {% for order in orders %}
                                 <tr id="order-row-{{ order.id }}" class="{% if order.is_copied %}bg-success bg-opacity-25{% elif order.phone in duplicate_phones %}bg-danger bg-opacity-10 border-danger border-2{% else %}bg-white{% endif %}">
                                     <td class="px-3">
@@ -499,28 +499,10 @@
                         </table>
                     </div>
                     
-                    {% if pagination and pagination.pages > 1 %}
-                    <nav aria-label="Page navigation" class="mt-4">
-                      <ul class="pagination justify-content-center">
-                        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
-                          <a class="page-link" href="{{ url_for('index', page=pagination.prev_num, tab='orders', search=search_query, company=filter_company, status=filter_status, courier_id=filter_courier, region=filter_region) if pagination.has_prev else '#' }}">السابق</a>
-                        </li>
-                        
-                        {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
-                          {% if p %}
-                            <li class="page-item {% if p == pagination.page %}active{% endif %}">
-                              <a class="page-link" href="{{ url_for('index', page=p, tab='orders', search=search_query, company=filter_company, status=filter_status, courier_id=filter_courier, region=filter_region) }}">{{ p }}</a>
-                            </li>
-                          {% else %}
-                            <li class="page-item disabled"><span class="page-link">...</span></li>
-                          {% endif %}
-                        {% endfor %}
-                        
-                        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
-                          <a class="page-link" href="{{ url_for('index', page=pagination.next_num, tab='orders', search=search_query, company=filter_company, status=filter_status, courier_id=filter_courier, region=filter_region) if pagination.has_next else '#' }}">التالي</a>
-                        </li>
-                      </ul>
-                    </nav>
+                    {% if pagination and pagination.has_next %}
+                    <div id="infinite-scroll-trigger" data-next-url="{{ url_for('index', page=pagination.next_num, tab='orders', search=search_query, company=filter_company, status=filter_status, courier_id=filter_courier, region=filter_region) }}" class="text-center py-4 text-muted fw-bold">
+                        <i class="fa-solid fa-spinner fa-spin me-2"></i> جاري تحميل المزيد...
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -1049,5 +1031,64 @@
         </div>
     </div>
 </div>
+
+
+<script>
+(function() {
+    function initInfiniteScroll() {
+        const trigger = document.getElementById('infinite-scroll-trigger');
+        if (!trigger || trigger.dataset.observerAttached) return;
+        
+        trigger.dataset.observerAttached = 'true';
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    const nextUrl = trigger.getAttribute('data-next-url');
+                    if (nextUrl) {
+                        trigger.removeAttribute('data-next-url'); // Prevent duplicate requests
+                        
+                        fetch(nextUrl, {
+                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                        })
+                        .then(response => response.text())
+                        .then(html => {
+                            const parser = new DOMParser();
+                            const doc = parser.parseFromString(html, 'text/html');
+                            
+                            // Append new rows to tbody
+                            const newRows = doc.querySelectorAll('#orders-tbody tr');
+                            const tbody = document.getElementById('orders-tbody');
+                            if (tbody && newRows.length > 0) {
+                                newRows.forEach(row => tbody.appendChild(row));
+                            }
+                            
+                            // Update or remove trigger
+                            const newTrigger = doc.getElementById('infinite-scroll-trigger');
+                            if (newTrigger && newTrigger.getAttribute('data-next-url')) {
+                                trigger.setAttribute('data-next-url', newTrigger.getAttribute('data-next-url'));
+                            } else {
+                                trigger.style.display = 'none';
+                                observer.disconnect();
+                            }
+                        })
+                        .catch(err => console.error("Error loading more orders:", err));
+                    }
+                }
+            });
+        }, { rootMargin: '300px' }); // Trigger load 300px before reaching the end
+
+        observer.observe(trigger);
+    }
+    
+    // Run on standard load
+    initInfiniteScroll();
+    
+    // Also run when Turbo injects new HTML
+    document.addEventListener('turbo:load', function() {
+        setTimeout(initInfiniteScroll, 100);
+    });
+})();
+</script>
 
 {% endblock %}
