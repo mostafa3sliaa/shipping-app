@@ -280,7 +280,7 @@
                 <form action="{{ url_for('index') }}" method="GET" class="row g-2 align-items-center">
                     <input type="hidden" name="tab" value="orders">
                     
-                    <div class="col-md-3">
+                    <div class="col-md-2">
                         <div class="input-group">
                             <span class="input-group-text bg-primary text-white"><i class="fa-solid fa-search"></i></span>
                             <input type="text" id="liveSearchInput" name="search" class="form-control border-primary" placeholder="بحث بالبوليصة، الاسم..." value="{{ search_query }}" oninput="liveSearch()">
@@ -323,19 +323,20 @@
                         </select>
                     </div>
 
-                    <div class="col-md-1 d-flex align-items-center justify-content-center">
+                    <div class="col-auto d-flex align-items-center justify-content-center">
                         <div class="form-check form-switch mt-1">
                             <input class="form-check-input" type="checkbox" role="switch" id="duplicateFilter" name="duplicates" value="1" onchange="this.form.submit()" {% if filter_duplicates == '1' %}checked{% endif %}>
                             <label class="form-check-label fw-bold text-danger ms-1" for="duplicateFilter" style="font-size: 0.85rem;" title="عرض الأرقام المكررة فقط">مكرر</label>
                         </div>
                     </div>
                     
-                    <div class="col-md-1 d-flex gap-2">
-                        {% if search_query or filter_company or filter_status or filter_courier or filter_region %}
-                        <a href="{{ url_for('index', tab='orders') }}" class="btn btn-outline-danger w-100 fw-bold" title="إلغاء الفلاتر"><i class="fa-solid fa-times"></i></a>
+                    <div class="col d-flex gap-2 justify-content-end">
+                        <button type="submit" formaction="{{ url_for('export_excel') }}" class="btn btn-outline-success w-100 fw-bold" style="max-width: 120px;" title="تحميل الإكسيل للنتائج الحالية"><i class="fa-solid fa-file-excel"></i> إكسيل</button>
+                        {% if search_query or filter_company or filter_status or filter_courier or filter_region or filter_duplicates %}
+                        <a href="{{ url_for('index', tab='orders') }}" class="btn btn-outline-danger fw-bold flex-shrink-0" title="إلغاء الفلاتر"><i class="fa-solid fa-times"></i></a>
                         {% endif %}
                         <!-- Hidden submit for enter key in search -->
-                        <button type="submit" style="display: none;"></button>
+                        <button type="submit" formaction="{{ url_for('index') }}" style="display: none;"></button>
                     </div>
                 </form>
             </div>

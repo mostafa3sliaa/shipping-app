@@ -3,7 +3,7 @@ import uuid
 import re
 import pandas as pd
 import hashlib
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from sqlalchemy.orm import joinedload
@@ -11,6 +11,7 @@ from sqlalchemy import or_, text
 from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from io import BytesIO
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'
@@ -332,6 +333,78 @@ def index():
                            scanned_query=scanned_tracking,
                            deposit_history=deposit_history,
                            duplicate_phones=duplicate_phones)
+
+@app.route('/export_excel', methods=['GET'])
+@login_required
+def export_excel():
+    search_query = request.args.get('search', '').strip()
+    filter_company = request.args.get('company', '')
+    filter_status = request.args.get('status', '')
+    filter_courier = request.args.get('courier_id', '')
+    filter_region = request.args.get('region', '')
+    filter_duplicates = request.args.get('duplicates', '')
+
+    query = Order.query.options(joinedload(Order.company), joinedload(Order.courier))
+    
+    if search_query:
+        query = query.filter(or_(
+            Order.tracking_number.contains(search_query),
+            Order.client_name.contains(search_query),
+            Order.phone.contains(search_query)
+        ))
+    if filter_company:
+        query = query.filter_by(company_id=filter_company)
+    if filter_status:
+        query = query.filter_by(status=filter_status)
+    if filter_courier:
+        query = query.filter_by(courier_id=filter_courier)
+    if filter_region:
+        query = query.filter_by(region=filter_region)
+    if filter_duplicates == '1':
+        duplicate_phones_query = db.session.query(Order.phone).group_by(Order.phone).having(db.func.count(Order.id) > 1).all()
+        duplicate_phones = set([r[0] for r in duplicate_phones_query if r[0]])
+        if duplicate_phones:
+            query = query.filter(Order.phone.in_(list(duplicate_phones)))
+            
+    orders = query.order_by(Order.id.desc()).all()
+    
+    data = []
+    for o in orders:
+        data.append({
+            'رقم البوليصة': o.tracking_number,
+            'العميل': o.client_name,
+            'رقم التليفون': o.phone,
+            'المنطقة': o.region,
+            'العنوان': o.address,
+            'الشركة': o.company.name if o.company else '',
+            'المندوب': o.courier.name if o.courier else '',
+            'مبلغ التحصيل (COD)': o.cod,
+            'رسوم الشحن': o.shipping_fee,
+            'المبلغ المحصل فعلياً': o.collected_amount,
+            'عمولة المندوب': o.courier_fee,
+            'الحالة': o.status,
+            'التاريخ': o.created_at.strftime('%Y-%m-%d') if o.created_at else ''
+        })
+        
+    df = pd.DataFrame(data)
+    
+    output = BytesIO()
+    # use ExcelWriter
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        df.to_excel(writer, index=False, sheet_name='Orders')
+        
+    output.seek(0)
+    
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filename = f"orders_export_{timestamp}.xlsx"
+    
+    return send_file(
+        output,
+        as_attachment=True,
+        download_name=filename,
+        mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    )
+
 
 @app.route('/order/new', methods=['POST'])
 def new_order():
