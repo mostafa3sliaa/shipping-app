@@ -375,6 +375,10 @@ def export_excel():
         shipping = o.shipping_fee or 0
         net = total_cod - shipping
         
+        status_display = o.status
+        if o.status == 'مع المندوب' and o.courier:
+            status_display = f"مع المندوب ({o.courier.name})"
+            
         data.append({
             'رقم البوليصة': o.tracking_number,
             'العميل': o.client_name,
@@ -387,7 +391,7 @@ def export_excel():
             'الشحن': shipping,
             'الصافي': net,
             'عمولة المندوب': o.courier_fee or 0,
-            'الحالة': o.status,
+            'الحالة': status_display,
             'التاريخ': o.created_at.strftime('%Y-%m-%d') if o.created_at else ''
         })
         
@@ -1071,6 +1075,10 @@ def export_courier_excel(courier_id):
     
     data = []
     for o in orders:
+        status_display = o.status
+        if o.status == 'مع المندوب' and o.courier:
+            status_display = f"مع المندوب ({o.courier.name})"
+            
         data.append({
             'رقم البوليصة': o.tracking_number,
             'العميل': o.client_name,
@@ -1078,7 +1086,7 @@ def export_courier_excel(courier_id):
             'المنطقة': o.region,
             'العنوان': o.address,
             'مبلغ التحصيل (COD)': o.cod,
-            'الحالة': o.status,
+            'الحالة': status_display,
             'الشركة': o.company.name if o.company else '',
             'المحتوى': o.content
         })
