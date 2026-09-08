@@ -885,6 +885,13 @@ def company_accounting():
                 db.func.sum(Order.collected_amount - Order.shipping_fee)
             ).filter_by(company_id=selected_company.id, company_settled=True).scalar() or 0.0
             
+            # 1.5 Manual Debt Added to Company
+            manual_debt = db.session.query(
+                db.func.sum(TreasuryTransaction.amount)
+            ).filter_by(tx_type='إضافة_رصيد_لشركة', entity_id=selected_company.id).scalar() or 0.0
+            
+            company_debt += manual_debt
+            
             # 2. Total Paid to Company (Negative transactions in Treasury)
             # When we pay the company, we insert a negative amount into TreasuryTransaction
             # So the total paid is the absolute sum of these negative transactions
@@ -897,9 +904,10 @@ def company_accounting():
             # 3. Current Balance
             company_balance = company_debt - company_paid
             
-            # Fetch transaction history for this company
-            transactions = TreasuryTransaction.query.filter_by(
-                tx_type='صرف_لشركة', entity_id=selected_company.id
+            # Fetch transaction history for this company (Both payouts and manual additions)
+            transactions = TreasuryTransaction.query.filter(
+                TreasuryTransaction.entity_id == selected_company.id,
+                TreasuryTransaction.tx_type.in_(['صرف_لشركة', 'إضافة_رصيد_لشركة'])
             ).order_by(TreasuryTransaction.created_at.desc()).all()
             
             # 4. Fetch orders ready to be settled (Delivered, Partial, Returned with shipping)
@@ -957,6 +965,32 @@ def company_pay(company_id):
             flash(f'تم تسجيل سداد للشركة بمبلغ {amount} ({method}) بنجاح!', 'success')
     except Exception as e:
         flash('حدث خطأ أثناء تسجيل الدفعة.', 'danger')
+        
+    return redirect(url_for('company_accounting', company_id=company_id))
+
+@app.route('/api/company/<int:company_id>/add_balance', methods=['POST'])
+def company_add_balance(company_id):
+    try:
+        amount = float(request.form.get('amount', 0))
+        notes = request.form.get('notes', '')
+        
+        if amount > 0:
+            # Adding balance to the company means we owe them more, so it's positive.
+            # We use 'مديونية' method so it doesn't affect Cash/Wallet totals.
+            tx = TreasuryTransaction(
+                amount=amount,
+                method='مديونية',
+                tx_type='إضافة_رصيد_لشركة',
+                entity_id=company_id,
+                notes=notes
+            )
+            db.session.add(tx)
+            db.session.commit()
+            flash(f'تمت إضافة مديونية بقيمة {amount} ج.م لرصيد الشركة بنجاح', 'success')
+        else:
+            flash('يجب إدخال مبلغ أكبر من الصفر', 'danger')
+    except Exception as e:
+        flash('حدث خطأ أثناء الإضافة', 'danger')
         
     return redirect(url_for('company_accounting', company_id=company_id))
 
