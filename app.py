@@ -809,6 +809,11 @@ def company_accounting():
             # 3. Current Balance
             company_balance = company_debt - company_paid
             
+            # Fetch transaction history for this company
+            transactions = TreasuryTransaction.query.filter_by(
+                tx_type='صرف_لشركة', entity_id=selected_company.id
+            ).order_by(TreasuryTransaction.created_at.desc()).all()
+            
             # 4. Fetch orders ready to be settled (Delivered, Partial, Returned with shipping)
             # We only settle orders that have reached a final status.
             orders = Order.query.options(joinedload(Order.courier)).filter(
@@ -839,7 +844,8 @@ def company_accounting():
         orders=orders,
         company_debt=company_debt,
         company_paid=company_paid,
-        company_balance=company_balance
+        company_balance=company_balance,
+        transactions=transactions if 'transactions' in locals() else []
     )
 
 @app.route('/api/company/<int:company_id>/pay', methods=['POST'])
@@ -865,6 +871,31 @@ def company_pay(company_id):
         flash('حدث خطأ أثناء تسجيل الدفعة.', 'danger')
         
     return redirect(url_for('company_accounting', company_id=company_id))
+
+@app.route('/treasury/deposit', methods=['POST'])
+@login_required
+def treasury_deposit():
+    try:
+        amount = float(request.form.get('amount', 0))
+        method = request.form.get('method', 'كاش')
+        notes = request.form.get('notes', 'إيداع يدوي')
+        
+        if amount > 0:
+            tx = TreasuryTransaction(
+                amount=amount,
+                method=method,
+                tx_type='إيداع_يدوي',
+                entity_id=None,
+                notes=notes
+            )
+            db.session.add(tx)
+            db.session.commit()
+            flash(f'تم إيداع مبلغ {amount} ج.م في ({method}) بنجاح!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('حدث خطأ أثناء تسجيل الإيداع.', 'danger')
+        
+    return redirect(url_for('index'))
 
 # --- Backwards Compatibility Routes for old URLs ---
 

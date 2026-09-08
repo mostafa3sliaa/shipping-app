@@ -110,7 +110,10 @@
                             <h5 class="fw-bold text-muted">الخزينة (كاش)</h5>
                             <h3 class="fw-bold text-success mb-0">{{ "{:,.2f}".format(treasury_cash) }} ج.م</h3>
                         </div>
-                        <i class="fa-solid fa-vault fa-3x text-success opacity-25"></i>
+                        <div class="text-end">
+                            <i class="fa-solid fa-vault fa-3x text-success opacity-25 d-block mb-2"></i>
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold" data-bs-toggle="modal" data-bs-target="#depositModal" onclick="document.getElementById('depositMethod').value='كاش'">+ إيداع</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -121,7 +124,10 @@
                             <h5 class="fw-bold text-muted">المحفظة (تحويل)</h5>
                             <h3 class="fw-bold text-primary mb-0">{{ "{:,.2f}".format(treasury_transfer) }} ج.م</h3>
                         </div>
-                        <i class="fa-solid fa-building-columns fa-3x text-primary opacity-25"></i>
+                        <div class="text-end">
+                            <i class="fa-solid fa-building-columns fa-3x text-primary opacity-25 d-block mb-2"></i>
+                            <button type="button" class="btn btn-sm btn-outline-primary fw-bold" data-bs-toggle="modal" data-bs-target="#depositModal" onclick="document.getElementById('depositMethod').value='تحويل'">+ إيداع</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -928,6 +934,38 @@
             alert('حدث خطأ أثناء النسخ!');
         });
     }
-
 </script>
+
+<!-- Deposit Modal -->
+<div class="modal fade" id="depositModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-success text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-money-bill-transfer me-2"></i> إيداع رصيد يدوي</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form method="POST" action="{{ url_for('treasury_deposit') }}">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">المبلغ (ج.م)</label>
+                        <input type="number" step="0.01" name="amount" class="form-control form-control-lg fw-bold text-success" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">طريقة الإيداع</label>
+                        <select name="method" id="depositMethod" class="form-select fw-bold" required>
+                            <option value="كاش">كاش (في الخزينة)</option>
+                            <option value="تحويل">تحويل (في المحفظة)</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">ملاحظات (اختياري)</label>
+                        <input type="text" name="notes" class="form-control" placeholder="مثال: رصيد افتتاحي، إضافة من المالك...">
+                    </div>
+                    <button type="submit" class="btn btn-success btn-lg w-100 fw-bold">تأكيد الإيداع</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
