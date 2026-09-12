@@ -213,7 +213,7 @@ def index():
     
     # Orders & Search & Filters
     search_query = request.args.get('search', '').strip()
-    filter_company = request.args.get('company', '')
+    filter_company = request.args.get('company_id') or request.args.get('company', '')
     filter_status = request.args.get('status', '')
     filter_courier = request.args.get('courier_id', '')
     filter_region = request.args.get('region', '')
@@ -233,16 +233,28 @@ def index():
         ))
         
     if filter_company:
-        query = query.filter_by(company_id=filter_company)
+        if filter_company == 'none':
+            query = query.filter(Order.company_id.is_(None))
+        else:
+            query = query.filter_by(company_id=filter_company)
         
     if filter_status:
-        query = query.filter_by(status=filter_status)
+        if filter_status == 'none':
+            query = query.filter(or_(Order.status.is_(None), Order.status == ''))
+        else:
+            query = query.filter_by(status=filter_status)
         
     if filter_courier:
-        query = query.filter_by(courier_id=filter_courier)
+        if filter_courier == 'none':
+            query = query.filter(Order.courier_id.is_(None))
+        else:
+            query = query.filter_by(courier_id=filter_courier)
         
     if filter_region:
-        query = query.filter_by(region=filter_region)
+        if filter_region == 'none':
+            query = query.filter(or_(Order.region.is_(None), Order.region == '', Order.region == 'غير محدد'))
+        else:
+            query = query.filter_by(region=filter_region)
         
     if filter_duplicates == '1' and duplicate_phones:
         query = query.filter(Order.phone.in_(list(duplicate_phones)))
@@ -283,9 +295,23 @@ def index():
             Order.client_name.contains(search_query),
             Order.phone.contains(search_query)
         ))
-    if filter_company: region_query = region_query.filter_by(company_id=filter_company)
-    if filter_status: region_query = region_query.filter_by(status=filter_status)
-    if filter_courier: region_query = region_query.filter_by(courier_id=filter_courier)
+    if filter_company:
+        if filter_company == 'none':
+            region_query = region_query.filter(Order.company_id.is_(None))
+        else:
+            region_query = region_query.filter_by(company_id=filter_company)
+            
+    if filter_status:
+        if filter_status == 'none':
+            region_query = region_query.filter(or_(Order.status.is_(None), Order.status == ''))
+        else:
+            region_query = region_query.filter_by(status=filter_status)
+            
+    if filter_courier:
+        if filter_courier == 'none':
+            region_query = region_query.filter(Order.courier_id.is_(None))
+        else:
+            region_query = region_query.filter_by(courier_id=filter_courier)
     
     regions = [r[0] for r in region_query.with_entities(Order.region).distinct().all() if r[0]]
     
@@ -345,7 +371,7 @@ def index():
 @login_required
 def export_excel():
     search_query = request.args.get('search', '').strip()
-    filter_company = request.args.get('company', '')
+    filter_company = request.args.get('company_id') or request.args.get('company', '')
     filter_status = request.args.get('status', '')
     filter_courier = request.args.get('courier_id', '')
     filter_region = request.args.get('region', '')
@@ -360,13 +386,25 @@ def export_excel():
             Order.phone.contains(search_query)
         ))
     if filter_company:
-        query = query.filter_by(company_id=filter_company)
+        if filter_company == 'none':
+            query = query.filter(Order.company_id.is_(None))
+        else:
+            query = query.filter_by(company_id=filter_company)
     if filter_status:
-        query = query.filter_by(status=filter_status)
+        if filter_status == 'none':
+            query = query.filter(or_(Order.status.is_(None), Order.status == ''))
+        else:
+            query = query.filter_by(status=filter_status)
     if filter_courier:
-        query = query.filter_by(courier_id=filter_courier)
+        if filter_courier == 'none':
+            query = query.filter(Order.courier_id.is_(None))
+        else:
+            query = query.filter_by(courier_id=filter_courier)
     if filter_region:
-        query = query.filter_by(region=filter_region)
+        if filter_region == 'none':
+            query = query.filter(or_(Order.region.is_(None), Order.region == '', Order.region == 'غير محدد'))
+        else:
+            query = query.filter_by(region=filter_region)
     if filter_duplicates == '1':
         duplicate_phones_query = db.session.query(Order.phone).group_by(Order.phone).having(db.func.count(Order.id) > 1).all()
         duplicate_phones = set([r[0] for r in duplicate_phones_query if r[0]])

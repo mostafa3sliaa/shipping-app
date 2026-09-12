@@ -290,6 +290,7 @@
                     <div class="col-md-2">
                         <select name="company_id" class="form-select border-primary" onchange="this.form.submit()">
                             <option value="">-- كل الشركات --</option>
+                            <option value="none" {% if filter_company == 'none' %}selected{% endif %}>-- بدون شركة --</option>
                             {% for company in companies %}
                             <option value="{{ company.id }}" {% if filter_company == company.id|string %}selected{% endif %}>{{ company.name }}</option>
                             {% endfor %}
@@ -299,6 +300,7 @@
                     <div class="col-md-2">
                         <select name="courier_id" class="form-select border-primary" onchange="this.form.submit()">
                             <option value="">-- كل المناديب --</option>
+                            <option value="none" {% if filter_courier == 'none' %}selected{% endif %}>-- بدون مندوب --</option>
                             {% for c in couriers %}
                             <option value="{{ c.id }}" {% if filter_courier == c.id|string %}selected{% endif %}>{{ c.name }}</option>
                             {% endfor %}
@@ -308,6 +310,7 @@
                     <div class="col-md-2">
                         <select name="region" class="form-select border-primary" onchange="this.form.submit()">
                             <option value="">-- كل المناطق --</option>
+                            <option value="none" {% if filter_region == 'none' %}selected{% endif %}>-- بدون منطقة --</option>
                             {% for r in regions %}
                             <option value="{{ r }}" {% if filter_region == r %}selected{% endif %}>{{ r }}</option>
                             {% endfor %}
@@ -317,6 +320,7 @@
                     <div class="col-md-2">
                         <select name="status" class="form-select border-primary" onchange="this.form.submit()">
                             <option value="">-- كل الحالات --</option>
+                            <option value="none" {% if filter_status == 'none' %}selected{% endif %}>-- بدون حالة --</option>
                             {% for status in statuses %}
                             <option value="{{ status }}" {% if filter_status == status %}selected{% endif %}>{{ status }}</option>
                             {% endfor %}
