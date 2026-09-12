@@ -865,7 +865,7 @@ def bulk_action():
         flash(f'تم إلغاء علامة النسخ لـ {len(order_ids)} أوردر', 'info')
     elif action == 'print_selected':
         # Don't redirect, just render the print template directly with selected orders
-        return render_template('print_batch.html', orders=orders_to_update)
+        return render_template('print.html', orders=orders_to_update)
         
     db.session.commit()
     return redirect(url_for('index', tab='orders'))
