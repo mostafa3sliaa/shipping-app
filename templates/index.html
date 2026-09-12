@@ -476,7 +476,8 @@
                                                 data-phone="{{ order.phone }}"
                                                 data-address="{{ order.address }}"
                                                 data-content="{{ order.content if order.content else '' }}"
-                                                data-price="{{ order.cod }}">
+                                                data-price="{{ order.cod }}"
+                                                data-company="{{ order.company.name if order.company else '' }}">
                                             {% if order.is_copied %}<i class="fa-solid fa-check"></i>{% else %}<i class="fa-brands fa-whatsapp"></i>{% endif %}
                                         </button>
                                         <button type="button" class="btn btn-sm btn-primary rounded-circle mb-1" title="تعديل" onclick="openEditModal({{ order.id }})">
@@ -978,8 +979,12 @@
         const address = btnElement.getAttribute('data-address');
         const content = btnElement.getAttribute('data-content');
         const price = btnElement.getAttribute('data-price');
+        const company = btnElement.getAttribute('data-company');
         
-        const textToCopy = `العميل: ${client}\nالهاتف: ${phone}\nالعنوان: ${address}\nالمنتج: ${content}\nالسعر: ${price}`;
+        let textToCopy = `العميل: ${client}\nالهاتف: ${phone}\nالعنوان: ${address}\nالمنتج: ${content}\nالسعر: ${price}`;
+        if (company && company.trim() !== '') {
+            textToCopy += `\nالشركة: ${company}`;
+        }
         
         navigator.clipboard.writeText(textToCopy).then(() => {
             // Save to DB
