@@ -863,8 +863,10 @@
                     if (orders.length === 1) {
                         checkbox.checked = true;
                     } else {
-                        // Uncheck it in case it was checked, so they have to manually choose
-                        checkbox.checked = false;
+                        // If it's a duplicate and it was already checked by the user previously, keep it checked
+                        if (!checkbox.checked) {
+                            checkbox.checked = false;
+                        }
                     }
                     
                     // Highlight the row temporarily
