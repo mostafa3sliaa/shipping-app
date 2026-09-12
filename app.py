@@ -64,7 +64,7 @@ class Order(db.Model):
     address = db.Column(db.String(255))
     region = db.Column(db.String(100))
     cod = db.Column(db.Float, default=0.0)
-    shipping_fee = db.Column(db.Float, default=0.0)
+    shipping_fee = db.Column(db.Float, default=70.0)
     status = db.Column(db.String(50), default='مخزن')
     batch_id = db.Column(db.String(50))
     
@@ -229,7 +229,8 @@ def index():
         query = query.filter(or_(
             Order.tracking_number.contains(search_query),
             Order.client_name.contains(search_query),
-            Order.phone.contains(search_query)
+            Order.phone.contains(search_query),
+            Order.batch_id == search_query
         ))
         
     if filter_company:
@@ -293,7 +294,8 @@ def index():
         region_query = region_query.filter(or_(
             Order.tracking_number.contains(search_query),
             Order.client_name.contains(search_query),
-            Order.phone.contains(search_query)
+            Order.phone.contains(search_query),
+            Order.batch_id == search_query
         ))
     if filter_company:
         if filter_company == 'none':
@@ -383,7 +385,8 @@ def export_excel():
         query = query.filter(or_(
             Order.tracking_number.contains(search_query),
             Order.client_name.contains(search_query),
-            Order.phone.contains(search_query)
+            Order.phone.contains(search_query),
+            Order.batch_id == search_query
         ))
     if filter_company:
         if filter_company == 'none':
@@ -647,20 +650,20 @@ def upload_file():
                     region = 'غير محدد'
                     
                     cod_val = get_cell(row, col_map['cod'], 0.0)
-                    shipping_val = get_cell(row, col_map['shipping'], 0.0)
+                    shipping_val = get_cell(row, col_map['shipping'], 70.0)
                     content_val = str(get_cell(row, col_map['content'])).strip()
                     if content_val.lower() == 'nan': content_val = ''
-                    def parse_float(val):
-                        if pd.isna(val): return 0.0
+                    def parse_float(val, default_val=0.0):
+                        if pd.isna(val) or str(val).strip() == '': return default_val
                         if isinstance(val, (int, float)): return float(val)
                         cleaned = re.sub(r'[^\d.]', '', str(val))
                         try:
-                            return float(cleaned) if cleaned else 0.0
+                            return float(cleaned) if cleaned else default_val
                         except ValueError:
-                            return 0.0
+                            return default_val
 
-                    cod = parse_float(cod_val)
-                    shipping_fee = parse_float(shipping_val)
+                    cod = parse_float(cod_val, 0.0)
+                    shipping_fee = parse_float(shipping_val, 70.0)
                     
                     order_company_id = company.id
                     order = Order(
@@ -686,8 +689,8 @@ def upload_file():
                     continue
                     
             db.session.commit()
-            flash(f'تم رفع وحفظ {success_count} أوردر بنجاح! تم تعيين بوالص جديدة لهم.', 'success')
-            return redirect(url_for('print_batch', batch_id=batch_id))
+            flash(f'تم رفع وحفظ {success_count} أوردر بنجاح! راجع الأوردرات في هذا الجدول ثم يمكنك تحديدها جميعاً والضغط على (طباعة البوالص).', 'success')
+            return redirect(url_for('index', search=batch_id, tab='orders'))
             
         except Exception as e:
             flash(f'حدث خطأ أثناء قراءة الملف: {str(e)}', 'danger')
@@ -860,6 +863,9 @@ def bulk_action():
         for order in orders_to_update:
             order.is_copied = False
         flash(f'تم إلغاء علامة النسخ لـ {len(order_ids)} أوردر', 'info')
+    elif action == 'print_selected':
+        # Don't redirect, just render the print template directly with selected orders
+        return render_template('print_batch.html', orders=orders_to_update)
         
     db.session.commit()
     return redirect(url_for('index', tab='orders'))
