@@ -491,7 +491,7 @@
                                         <button type="button" class="btn btn-sm btn-primary rounded-circle mb-1" title="تعديل" onclick="openEditModal({{ order.id }})">
                                             <i class="fa-solid fa-pen"></i>
                                         </button>
-                                        <button type="button" class="btn btn-sm btn-danger rounded-circle mb-1" title="مسح" onclick="if(confirm('هل تريد مسح هذا الأوردر نهائياً؟')) { document.getElementById('delete-form-{{ order.id }}').submit(); }">
+                                        <button type="button" class="btn btn-sm btn-danger rounded-circle mb-1" title="مسح" onclick="deleteSingleOrder({{ order.id }})">
                                             <i class="fa-solid fa-trash"></i>
                                         </button>
                                     </td>
@@ -516,10 +516,6 @@
                 </div>
             </div>
         </form>
-
-        {% for order in orders %}
-        <form id="delete-form-{{ order.id }}" action="{{ url_for('delete_order', order_id=order.id) }}" method="POST" style="display: none;"></form>
-        {% endfor %}
         
         <!-- Single Edit Modal for ALL orders -->
         <div class="modal fade" id="singleEditModal" tabindex="-1" aria-hidden="true">
@@ -940,6 +936,17 @@
                 checkbox.checked = this.checked;
             }
         });
+    }
+
+    // Single Delete Order JS
+    function deleteSingleOrder(orderId) {
+        if (confirm('هل تريد مسح هذا الأوردر نهائياً؟')) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/order/' + orderId + '/delete';
+            document.body.appendChild(form);
+            form.submit();
+        }
     }
 
     // Single Edit Modal JS

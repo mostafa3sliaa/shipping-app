@@ -17,6 +17,13 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'
 import os
 app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or 'sqlite:///shipping.db'
+if os.environ.get('DATABASE_URL'):
+    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+        'pool_size': 5,
+        'max_overflow': 10,
+        'pool_recycle': 300,
+        'pool_pre_ping': True
+    }
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
@@ -180,18 +187,22 @@ def index():
     
     active_couriers = Courier.query.count()
     
-    # Advanced Dashboard Stats
-    region_stats = db.session.query(
-        Order.region,
-        db.func.count(Order.id).label('count'),
-        db.func.sum(Order.cod - Order.shipping_fee).label('net')
-    ).group_by(Order.region).all()
-    
-    company_stats = db.session.query(
-        Company.name,
-        db.func.count(Order.id).label('count'),
-        db.func.sum(Order.cod - Order.shipping_fee).label('net')
-    ).join(Order).group_by(Company.name).all()
+    # Advanced Dashboard Stats (Only computed if viewing dashboard tab)
+    if active_tab == 'dashboard':
+        region_stats = db.session.query(
+            Order.region,
+            db.func.count(Order.id).label('count'),
+            db.func.sum(Order.cod - Order.shipping_fee).label('net')
+        ).group_by(Order.region).all()
+        
+        company_stats = db.session.query(
+            Company.name,
+            db.func.count(Order.id).label('count'),
+            db.func.sum(Order.cod - Order.shipping_fee).label('net')
+        ).join(Order).group_by(Company.name).all()
+    else:
+        region_stats = []
+        company_stats = []
     
     # Orders & Search & Filters
     search_query = request.args.get('search', '').strip()
@@ -258,9 +269,9 @@ def index():
     filtered_shipping = agg[2] or 0.0
     filtered_net = filtered_cod - filtered_shipping
     
-    # Pagination
+    # Pagination (fast initial page load of 30, subsequent pages load automatically on scroll)
     page = request.args.get('page', 1, type=int)
-    pagination = query.order_by(Order.id.desc()).paginate(page=page, per_page=100, error_out=False)
+    pagination = query.order_by(Order.id.desc()).paginate(page=page, per_page=30, error_out=False)
     all_orders = pagination.items
     
     # Check duplicate phones ONLY for the current page items to highlight them in UI
@@ -322,10 +333,13 @@ def index():
         if not scanned_orders:
             flash('لا يوجد أوردر مطابق للبحث!', 'danger')
             
-    # Fetch manual deposit history
-    deposit_history = TreasuryTransaction.query.filter_by(
-        tx_type='إيداع_يدوي'
-    ).order_by(TreasuryTransaction.created_at.desc()).all()
+    # Fetch manual deposit history (only for dashboard)
+    if active_tab == 'dashboard':
+        deposit_history = TreasuryTransaction.query.filter_by(
+            tx_type='إيداع_يدوي'
+        ).order_by(TreasuryTransaction.created_at.desc()).limit(50).all()
+    else:
+        deposit_history = []
     
     return render_template('index.html', 
                            total_orders=total_orders, 
