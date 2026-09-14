@@ -16,8 +16,12 @@ from io import BytesIO
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'supersecretkey'
 import os
-app.config['SQLALCHEMY_DATABASE_URI'] = os.environ.get('DATABASE_URL') or 'sqlite:///shipping.db'
-if os.environ.get('DATABASE_URL'):
+db_url = os.environ.get('DATABASE_URL')
+if db_url and db_url.startswith('postgres://'):
+    db_url = db_url.replace('postgres://', 'postgresql://', 1)
+app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///shipping.db'
+
+if db_url:
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
         'pool_size': 5,
         'max_overflow': 10,
@@ -101,14 +105,16 @@ class TreasuryTransaction(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 with app.app_context():
-    # Run table creation for fresh local databases (e.g. SQLite / testing)
-    if not os.environ.get('DATABASE_URL'):
-        db.create_all()
-        if not User.query.filter_by(username='admin').first():
-            hashed = generate_password_hash('admin123')
-            default_admin = User(username='admin', password_hash=hashed, role='admin')
-            db.session.add(default_admin)
-            db.session.commit()
+    try:
+        if not os.environ.get('DATABASE_URL'):
+            db.create_all()
+            if not User.query.filter_by(username='admin').first():
+                hashed = generate_password_hash('admin123')
+                default_admin = User(username='admin', password_hash=hashed, role='admin')
+                db.session.add(default_admin)
+                db.session.commit()
+    except Exception:
+        pass
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
