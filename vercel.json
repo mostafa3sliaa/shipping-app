@@ -1,6 +1,5 @@
 {
   "version": 2,
-  "regions": ["lhr1", "fra1"],
   "builds": [
     {
       "src": "app.py",
