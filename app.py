@@ -132,42 +132,53 @@ def index():
     active_tab = request.args.get('tab', 'dashboard')
     scanned_tracking = request.args.get('scanned', None)
     
-    # --- OPTIMIZED QUERIES ---
-    # 1. Fetch all Status counts in ONE query
-    status_counts = db.session.query(Order.status, db.func.count(Order.id)).group_by(Order.status).all()
-    status_dict = dict(status_counts)
+    # 1. Fetch all Status counts, goods sums, and profits in ONE combined query
+    metrics = db.session.query(
+        Order.status,
+        db.func.count(Order.id),
+        db.func.sum(Order.cod),
+        db.func.sum(Order.shipping_fee),
+        db.func.sum(Order.collected_amount),
+        db.func.sum(Order.courier_fee)
+    ).group_by(Order.status).all()
     
-    total_orders = sum(status_dict.values())
+    status_dict = {}
+    total_orders = 0
+    full_goods = 0.0
+    partial_goods = 0.0
+    company_profit = 0.0
+    
+    for st, count, cod_sum, shipping_sum, collected_sum, courier_fee_sum in metrics:
+        cnt = count or 0
+        cod_s = cod_sum or 0.0
+        ship_s = shipping_sum or 0.0
+        coll_s = collected_sum or 0.0
+        fee_s = courier_fee_sum or 0.0
+        
+        status_dict[st] = cnt
+        total_orders += cnt
+        
+        if st not in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن']:
+            full_goods += (cod_s - ship_s)
+        if st == 'تسليم جزئي / مرتجع':
+            partial_goods += (cod_s - coll_s)
+        if st in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
+            company_profit += (ship_s - fee_s)
+            
+    total_goods = full_goods + partial_goods
     new_in_warehouse = status_dict.get('مخزن', 0)
     postponed = status_dict.get('مؤجل', 0)
     returned = status_dict.get('مرتجع', 0)
     returned_company = status_dict.get('مرتجع شركة', 0)
     with_courier = status_dict.get('مع المندوب', 0)
     
-    # 2. Fetch all Treasury sums in ONE query
+    # 2. Fetch Treasury sums in ONE query
     treasury_sums = db.session.query(TreasuryTransaction.method, db.func.sum(TreasuryTransaction.amount)).group_by(TreasuryTransaction.method).all()
     treasury_dict = dict(treasury_sums)
     treasury_cash = treasury_dict.get('كاش', 0.0)
     treasury_transfer = treasury_dict.get('تحويل', 0.0)
     
     active_couriers = Courier.query.count()
-    
-    # Active Goods & Profit (Need custom filters, so we keep these separate but they are only 3 queries now)
-    full_goods = db.session.query(db.func.sum(Order.cod - Order.shipping_fee)).filter(
-        ~Order.status.in_(['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن'])
-    ).scalar() or 0.0
-    
-    partial_goods = db.session.query(db.func.sum(Order.cod - Order.collected_amount)).filter(
-        Order.status == 'تسليم جزئي / مرتجع'
-    ).scalar() or 0.0
-    
-    total_goods = full_goods + partial_goods
-    
-    company_profit = db.session.query(
-        db.func.sum(Order.shipping_fee - Order.courier_fee)
-    ).filter(
-        Order.status.in_(['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن'])
-    ).scalar() or 0.0
     
     # Advanced Dashboard Stats
     region_stats = db.session.query(
