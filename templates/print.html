@@ -3,13 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>طباعة بوالص الشحن</title>
+    <title>طباعة استيكر الباركود (طابعة حرارية)</title>
     <!-- Google Fonts: Cairo -->
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@600;700;800;900&display=swap" rel="stylesheet">
     <!-- Font Awesome -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <!-- JsBarcode -->
     <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+    <style id="print-style">
+        @page {
+            size: 60mm 20mm;
+            margin: 0mm;
+        }
+    </style>
     <style>
         * {
             box-sizing: border-box;
@@ -20,25 +26,25 @@
             font-family: 'Cairo', sans-serif;
             background-color: #f1f3f5;
             margin: 0;
-            padding: 20px;
-            color: #111;
+            padding: 15px;
+            color: #000;
         }
         
         .controls {
-            max-width: 800px;
-            margin: 0 auto 25px auto;
+            max-width: 650px;
+            margin: 0 auto 20px auto;
             background: white;
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
             text-align: center;
         }
         
         .controls-btns {
             display: flex;
             justify-content: center;
-            gap: 15px;
-            margin-top: 15px;
+            gap: 10px;
+            margin-top: 12px;
             flex-wrap: wrap;
         }
         
@@ -46,230 +52,127 @@
             background-color: #0d6efd;
             color: white;
             border: none;
-            padding: 10px 24px;
-            font-size: 16px;
+            padding: 8px 18px;
+            font-size: 15px;
             font-weight: bold;
             font-family: 'Cairo', sans-serif;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             text-decoration: none;
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            transition: all 0.2s;
-        }
-        .btn:hover {
-            opacity: 0.9;
-            transform: translateY(-1px);
+            gap: 6px;
         }
         .btn-success { background-color: #198754; }
         .btn-secondary { background-color: #6c757d; }
         
-        /* Container of waybills */
-        .waybills-wrapper {
+        .size-selector {
+            margin: 10px 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            font-weight: bold;
+        }
+        .size-btn {
+            background: #e9ecef;
+            border: 1px solid #ced4da;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-family: 'Cairo', sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .size-btn.active {
+            background: #0d6efd;
+            color: white;
+            border-color: #0d6efd;
+        }
+
+        /* Container of labels */
+        .labels-container {
             display: flex;
             flex-direction: column;
             align-items: center;
-            gap: 25px;
+            gap: 12px;
         }
         
-        /* Individual Waybill Sheet */
-        .waybill {
+        /* Thermal Label Sticker */
+        .label {
             background-color: #fff;
-            width: 100mm;
-            min-height: 145mm;
-            padding: 5mm;
-            border: 2px solid #000;
-            border-radius: 4px;
+            width: 60mm;
+            height: 20mm;
+            max-height: 20mm;
+            padding: 0.8mm 1.5mm;
+            margin: 0 auto;
+            border: 1px dashed #aaa;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
-            position: relative;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+            box-sizing: border-box;
             page-break-after: always;
             break-after: page;
-        }
-        
-        /* Header */
-        .waybill-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            border-bottom: 2px solid #000;
-            padding-bottom: 4px;
-            margin-bottom: 5px;
-        }
-        .company-info {
-            text-align: right;
-        }
-        .company-title {
-            font-size: 14px;
-            font-weight: 800;
-            color: #000;
-            margin: 0;
-        }
-        .company-name {
-            font-size: 13px;
-            font-weight: 700;
-            color: #222;
-        }
-        .order-date {
-            font-size: 10px;
-            color: #555;
-        }
-        .waybill-badge {
-            font-size: 11px;
-            font-weight: 800;
-            border: 1.5px solid #000;
-            padding: 2px 6px;
-            border-radius: 4px;
-            background: #eee;
+            text-align: center;
+            direction: rtl;
         }
         
         /* Barcode Area */
-        .barcode-section {
+        .barcode-box {
             text-align: center;
-            border-bottom: 1.5px solid #000;
-            padding-bottom: 4px;
-            margin-bottom: 6px;
+            line-height: 1;
+            margin: 0;
+            padding: 0;
         }
         .barcode-svg {
-            max-width: 100%;
-            height: 42px;
-        }
-        .tracking-num {
-            font-size: 13px;
-            font-weight: 900;
-            letter-spacing: 1px;
-            margin-top: -2px;
-            color: #000;
-            direction: ltr;
-            display: inline-block;
+            width: 100%;
+            max-width: 56mm;
+            height: 24px;
+            display: block;
+            margin: 0 auto;
         }
         
-        /* Section Cards */
-        .wb-section {
-            border: 1.5px solid #000;
-            border-radius: 4px;
-            margin-bottom: 6px;
-            overflow: hidden;
-        }
-        .wb-section-title {
-            background-color: #e9ecef;
-            border-bottom: 1px solid #000;
-            padding: 2px 6px;
-            font-size: 11px;
-            font-weight: 800;
+        /* Info Rows */
+        .info-row {
             display: flex;
             justify-content: space-between;
             align-items: center;
+            font-size: 9.5px;
+            line-height: 1.15;
+            font-weight: 800;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-        .wb-section-body {
-            padding: 5px 6px;
-            font-size: 11px;
-            line-height: 1.35;
+        .info-row span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
         }
-        
-        /* Client & Address Info */
         .client-name {
-            font-size: 13px;
+            max-width: 36mm;
+            text-align: right;
             font-weight: 900;
             color: #000;
-            margin-bottom: 2px;
         }
-        .client-phone {
-            font-size: 12px;
+        .price-tag {
+            text-align: left;
+            font-weight: 900;
+            font-size: 10px;
+            color: #000;
+            direction: ltr;
+        }
+        .phone-num {
+            text-align: right;
             font-weight: 800;
             direction: ltr;
-            text-align: right;
-            display: inline-block;
-            background: #f8f9fa;
-            padding: 1px 4px;
-            border-radius: 3px;
-            border: 1px dashed #aaa;
-            margin-bottom: 3px;
-        }
-        .client-region {
-            display: inline-block;
-            background: #000;
-            color: #fff;
-            padding: 1px 6px;
-            font-size: 10px;
-            font-weight: 800;
-            border-radius: 3px;
-            margin-bottom: 3px;
-        }
-        .client-address {
-            font-size: 11px;
-            font-weight: 700;
-            color: #111;
-            word-break: break-word;
-        }
-        
-        /* Content / Item Details */
-        .content-box {
-            background-color: #fafafa;
-            border: 1px dashed #999;
-            padding: 4px;
-            border-radius: 3px;
-            font-size: 10.5px;
-            font-weight: 600;
-            min-height: 24px;
-            word-break: break-word;
-        }
-        
-        /* Financial / COD Box - BIG & PROMINENT */
-        .cod-container {
-            background: #f8f9fa;
-            border: 2px solid #000;
-            border-radius: 5px;
-            padding: 6px;
-            text-align: center;
-            margin-bottom: 6px;
-        }
-        .cod-label {
-            font-size: 11px;
-            font-weight: 800;
-            color: #333;
-            margin-bottom: 2px;
-        }
-        .cod-amount {
-            font-size: 20px;
-            font-weight: 900;
-            color: #000;
-            letter-spacing: 0.5px;
-            line-height: 1.1;
-        }
-        .cod-sub {
             font-size: 9.5px;
-            font-weight: 700;
-            color: #555;
-            margin-top: 2px;
-            border-top: 1px dashed #ccc;
-            padding-top: 2px;
-            display: flex;
-            justify-content: space-around;
-        }
-        
-        /* Footer / Notes & Signature */
-        .waybill-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            border-top: 1px dashed #666;
-            padding-top: 4px;
-            font-size: 9px;
-            color: #444;
-        }
-        .signature-box {
-            text-align: center;
-            border-top: 1px solid #000;
-            width: 90px;
-            padding-top: 2px;
-            font-weight: 700;
+            color: #000;
         }
 
-        /* PRINT STYLES */
+        /* Print Mode */
         @media print {
             body {
                 background: white !important;
@@ -279,26 +182,16 @@
             .controls {
                 display: none !important;
             }
-            .waybills-wrapper {
+            .labels-container {
                 gap: 0 !important;
                 display: block !important;
             }
-            .waybill {
-                width: 100mm !important;
-                min-height: 145mm !important;
-                max-height: 150mm !important;
+            .label {
+                border: none !important;
                 margin: 0 auto !important;
-                padding: 4mm !important;
-                border: 2px solid #000 !important;
-                border-radius: 0 !important;
-                box-shadow: none !important;
                 page-break-after: always !important;
                 break-after: page !important;
                 page-break-inside: avoid !important;
-            }
-            @page {
-                size: 100mm 150mm;
-                margin: 0;
             }
         }
     </style>
@@ -306,137 +199,98 @@
 <body>
 
     <div class="controls">
-        <h3 style="margin-top: 0; color: #0d6efd; font-weight: 800;">
-            <i class="fa-solid fa-print me-2"></i> معاينة وطباعة بوالص الشحن الكاملة
-        </h3>
-        <p style="margin: 5px 0; color: #555; font-size: 14px;">
-            إجمالي عدد البوالص المحددة للطباعة: <strong>{{ orders|length }}</strong> بوليصة
+        <h4 style="margin: 0 0 5px 0; color: #0d6efd; font-weight: 800;">
+            <i class="fa-solid fa-barcode me-1"></i> طباعة استيكر حراري (60 مم)
+        </h4>
+        <p style="margin: 0 0 8px 0; font-size: 13px; color: #555;">
+            عدد الاستيكرات: <strong>{{ orders|length }}</strong> استيكر | البيانات: باركود + الاسم + التليفون + السعر
         </p>
 
-        <div style="background-color: #fff3cd; color: #856404; padding: 12px 16px; margin: 15px 0; border-radius: 8px; text-align: right; direction: rtl; font-size: 13px; font-weight: 600; border: 1px solid #ffeeba;">
-            <i class="fa-solid fa-circle-exclamation me-1"></i> <strong>تعليمات للحصول على أفضل طباعة:</strong>
-            <ul style="margin: 5px 0 0 20px; padding: 0;">
-                <li>في نافذة الطباعة، اختر المقاس المناسب (مثل <strong>100×150 مم / 4×6 بوصة</strong> للطابعات الحرارية، أو ورق A4 عادي).</li>
-                <li>تأكد من جعل الهوامش (<strong>Margins</strong>) ➔ <strong>بدون (None)</strong>.</li>
-                <li>ألغِ تفعيل خيار (<strong>Headers and Footers</strong> / الرؤوس والتذييلات) لمنع ظهور روابط المتصفح.</li>
-            </ul>
+        <!-- Sticker Height Selector (defaults to 20mm) -->
+        <div class="size-selector">
+            <span>ارتفاع الورق:</span>
+            <button type="button" class="size-btn active" onclick="setLabelHeight(20, this)">60×20 مم (الافتراضي)</button>
+            <button type="button" class="size-btn" onclick="setLabelHeight(25, this)">60×25 مم</button>
+            <button type="button" class="size-btn" onclick="setLabelHeight(30, this)">60×30 مم</button>
+        </div>
+
+        <div style="background-color: #fff3cd; color: #856404; padding: 8px 12px; margin: 8px 0; border-radius: 6px; font-size: 12px; font-weight: 700; text-align: right;">
+            ⚠️ في شاشة الطباعة: اجعل الهوامش (<strong>Margins</strong>) ➔ <strong>بدون (None)</strong>، وألغِ تفعيل (<strong>Headers & Footers</strong>).
         </div>
 
         <div class="controls-btns">
             <button class="btn btn-success" onclick="window.print()">
-                <i class="fa-solid fa-print"></i> طباعة البوالص الآن
+                <i class="fa-solid fa-print"></i> طباعة الآن
             </button>
             <a href="{{ url_for('index', tab='orders') }}" class="btn btn-secondary">
-                <i class="fa-solid fa-arrow-right"></i> العودة لقائمة الأوردرات
+                <i class="fa-solid fa-arrow-right"></i> العودة للأوردرات
             </a>
         </div>
     </div>
 
-    <div class="waybills-wrapper">
+    <div class="labels-container">
         {% for order in orders %}
-        <div class="waybill">
-            <!-- 1. Header -->
-            <div>
-                <div class="waybill-header">
-                    <div class="company-info">
-                        <div class="company-title">بوليصة شحن | WAYBILL</div>
-                        <div class="company-name">
-                            <i class="fa-solid fa-store" style="font-size: 11px;"></i>
-                            الراسل: {{ order.company.name if order.company else 'شركة شحن' }}
-                        </div>
-                    </div>
-                    <div style="text-align: left;">
-                        <span class="waybill-badge">شحن سريع</span>
-                        <div class="order-date">
-                            {{ order.created_at.strftime('%Y-%m-%d') if order.created_at else '' }}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 2. Barcode -->
-                <div class="barcode-section">
-                    <svg class="barcode-svg" id="barcode-{{ order.id }}" data-value="{{ order.tracking_number }}"></svg>
-                    <div>
-                        <span class="tracking-num">{{ order.tracking_number }}</span>
-                    </div>
-                </div>
-
-                <!-- 3. Recipient Info (العميل) -->
-                <div class="wb-section">
-                    <div class="wb-section-title">
-                        <span><i class="fa-solid fa-user me-1"></i> بيانات العميل المستلم</span>
-                        {% if order.region and order.region != 'غير محدد' %}
-                        <span class="client-region">{{ order.region }}</span>
-                        {% endif %}
-                    </div>
-                    <div class="wb-section-body">
-                        <div class="client-name">{{ order.client_name if order.client_name else 'عميل بدون اسم' }}</div>
-                        <div>
-                            <span class="client-phone"><i class="fa-solid fa-phone" style="font-size: 10px;"></i> {{ order.phone }}</span>
-                        </div>
-                        <div class="client-address">
-                            <strong><i class="fa-solid fa-location-dot" style="font-size: 10px;"></i> العنوان:</strong>
-                            {{ order.address if order.address else 'غير محدد' }}
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 4. Package Contents / Details -->
-                <div class="wb-section">
-                    <div class="wb-section-title">
-                        <span><i class="fa-solid fa-box-open me-1"></i> تفاصيل الشحنة والمنتج</span>
-                        <span>المندوب: {{ order.courier.name if order.courier else 'غير محدد' }}</span>
-                    </div>
-                    <div class="wb-section-body">
-                        <div class="content-box">
-                            {{ order.content if order.content else 'طرد بضائع' }}
-                        </div>
-                    </div>
-                </div>
+        <div class="label">
+            <!-- 1. Barcode -->
+            <div class="barcode-box">
+                <svg class="barcode-svg" data-value="{{ order.tracking_number }}"></svg>
             </div>
 
-            <!-- Bottom Section: COD & Footer -->
-            <div>
-                <!-- 5. Financial / COD -->
-                <div class="cod-container">
-                    <div class="cod-label">المبلغ المطلوب تحصيله من العميل (شامل الشحن)</div>
-                    <div class="cod-amount">
-                        {{ "{:,.2f}".format(order.cod) }} <span style="font-size: 14px;">ج.م</span>
-                    </div>
-                    <div class="cod-sub">
-                        <span>قيمة الشحن: {{ "{:,.2f}".format(order.shipping_fee or 0) }} ج.م</span>
-                        <span>الحالة: {{ order.status }}</span>
-                    </div>
-                </div>
+            <!-- 2. Name & Price -->
+            <div class="info-row">
+                <span class="client-name">الاسم: {{ order.client_name if order.client_name else '-' }}</span>
+                <span class="price-tag">{{ "{:,.0f}".format(order.cod) if order.cod == order.cod|int else "{:,.2f}".format(order.cod) }} ج.م</span>
+            </div>
 
-                <!-- 6. Footer Signature -->
-                <div class="waybill-footer">
-                    <div>
-                        <span>شكراً لتعاملكم معنا</span>
-                    </div>
-                    <div class="signature-box">
-                        توقيع المستلم
-                    </div>
-                </div>
+            <!-- 3. Phone -->
+            <div class="info-row">
+                <span class="phone-num">الهاتف: {{ order.phone if order.phone else '-' }}</span>
             </div>
         </div>
         {% endfor %}
     </div>
 
     <script>
-        // Generate barcodes
-        document.querySelectorAll('.barcode-svg').forEach(el => {
-            const val = el.getAttribute('data-value');
-            if (val) {
-                JsBarcode(el, val, {
-                    format: "CODE128",
-                    width: 1.8,
-                    height: 38,
-                    displayValue: false,
-                    margin: 0
-                });
-            }
-        });
+        // Initialize Barcodes
+        function initBarcodes(heightPx) {
+            document.querySelectorAll('.barcode-svg').forEach(el => {
+                const val = el.getAttribute('data-value');
+                if (val) {
+                    JsBarcode(el, val, {
+                        format: "CODE128",
+                        width: 1.15,
+                        height: heightPx || 18,
+                        fontSize: 8.5,
+                        font: "Cairo",
+                        textMargin: 1,
+                        margin: 0,
+                        displayValue: true
+                    });
+                }
+            });
+        }
+
+        // Run on load with default 20mm setting
+        initBarcodes(18);
+
+        // Allow user to switch sticker height if their roll is 25mm or 30mm
+        function setLabelHeight(heightMm, btn) {
+            document.querySelectorAll('.size-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+
+            // Update page size and label height
+            document.getElementById('print-style').innerHTML = `@page { size: 60mm ${heightMm}mm; margin: 0mm; }`;
+            document.querySelectorAll('.label').forEach(el => {
+                el.style.height = heightMm + 'mm';
+                el.style.maxHeight = heightMm + 'mm';
+            });
+
+            // Adjust barcode height slightly for taller stickers
+            let bcHeight = 18;
+            if (heightMm >= 25) bcHeight = 25;
+            if (heightMm >= 30) bcHeight = 32;
+            initBarcodes(bcHeight);
+        }
     </script>
 </body>
 </html>
