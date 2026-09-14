@@ -94,43 +94,14 @@ class TreasuryTransaction(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.now)
 
 with app.app_context():
-    try:
-        db.session.execute(text('ALTER TABLE "order" ALTER COLUMN phone TYPE VARCHAR(150);'))
-        db.session.execute(text('ALTER TABLE courier ALTER COLUMN phone TYPE VARCHAR(150);'))
-        db.session.commit()
-    except Exception as e:
-        db.session.rollback()
-        pass
-
-    db.create_all()
-    
-    # Create default admin if not exists
-    if not User.query.filter_by(username='admin').first():
-        hashed = generate_password_hash('admin123')
-        default_admin = User(username='admin', password_hash=hashed, role='admin')
-        db.session.add(default_admin)
-        db.session.commit()
-    # Safely add columns if they don't exist (SQLite)
-    new_columns = [
-        'batch_id VARCHAR(50)',
-        'courier_id INTEGER',
-        'created_at DATETIME',
-        'content TEXT',
-        'collected_amount FLOAT',
-        'courier_fee FLOAT'
-    ]
-    for col_def in new_columns:
-        col_name = col_def.split()[0]
-        try:
-            db.session.execute(text(f'ALTER TABLE "order" ADD COLUMN {col_def}'))
+    # Run table creation for fresh local databases (e.g. SQLite / testing)
+    if not os.environ.get('DATABASE_URL'):
+        db.create_all()
+        if not User.query.filter_by(username='admin').first():
+            hashed = generate_password_hash('admin123')
+            default_admin = User(username='admin', password_hash=hashed, role='admin')
+            db.session.add(default_admin)
             db.session.commit()
-        except Exception:
-            db.session.rollback()
-    
-    # Add a default courier for testing if none exists
-    Order.query.filter_by(status='جديد بالمخزن').update({'status': 'مخزن'})
-    Order.query.filter_by(status='قيد التوصيل').update({'status': 'مع المندوب'})
-    db.session.commit()
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -221,9 +192,16 @@ def index():
 
     query = Order.query.options(joinedload(Order.company), joinedload(Order.courier))
     
-    # Calculate duplicate phones globally
-    duplicate_phones_query = db.session.query(Order.phone).group_by(Order.phone).having(db.func.count(Order.id) > 1).all()
-    duplicate_phones = set([r[0] for r in duplicate_phones_query if r[0]])
+    # Duplicate phone filtering: only run full table scan if explicitly requested
+    if filter_duplicates == '1':
+        duplicate_phones_query = db.session.query(Order.phone).group_by(Order.phone).having(db.func.count(Order.id) > 1).all()
+        duplicate_phones = set([r[0] for r in duplicate_phones_query if r[0]])
+        if duplicate_phones:
+            query = query.filter(Order.phone.in_(list(duplicate_phones)))
+        else:
+            query = query.filter(Order.id == -1)
+    else:
+        duplicate_phones = set()
     
     if search_query:
         query = query.filter(or_(
@@ -257,9 +235,6 @@ def index():
         else:
             query = query.filter_by(region=filter_region)
         
-    if filter_duplicates == '1' and duplicate_phones:
-        query = query.filter(Order.phone.in_(list(duplicate_phones)))
-        
     # Get aggregates efficiently from DB instead of Python loop
     agg = query.with_entities(
         db.func.count(Order.id),
@@ -277,19 +252,26 @@ def index():
     pagination = query.order_by(Order.id.desc()).paginate(page=page, per_page=100, error_out=False)
     all_orders = pagination.items
     
+    # Check duplicate phones ONLY for the current page items to highlight them in UI
+    if filter_duplicates != '1' and all_orders:
+        page_phones = [o.phone for o in all_orders if o.phone]
+        if page_phones:
+            dup_q = db.session.query(Order.phone).filter(Order.phone.in_(page_phones)).group_by(Order.phone).having(db.func.count(Order.id) > 1).all()
+            duplicate_phones = set([r[0] for r in dup_q if r[0]])
+
     if search_query or filter_company or filter_status or filter_courier or filter_region:
         active_tab = 'orders' # Force orders tab if filtering
         
-    # Couriers & Companies for Modals (Only companies/couriers with orders)
-    couriers = Courier.query.join(Order).distinct().all()
-    companies = Company.query.join(Order).distinct().all()
+    # Couriers & Companies for Modals (fast query without joining all orders)
+    couriers = Courier.query.order_by(Courier.name).all()
+    companies = Company.query.order_by(Company.name).all()
     
     # Active statuses in DB
     db_statuses = [r[0] for r in db.session.query(Order.status).distinct().all()]
     statuses = [s for s in ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع', 'مرتجع شركة', 'مرتجع بشحن'] if s in db_statuses]
     
-    # Active regions in DB based on current filters (excluding region itself)
-    region_query = Order.query.options(joinedload(Order.company), joinedload(Order.courier))
+    # Active regions in DB based on current filters (fast query without joinedload)
+    region_query = Order.query
     if search_query:
         region_query = region_query.filter(or_(
             Order.tracking_number.contains(search_query),
