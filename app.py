@@ -701,7 +701,7 @@ def upload_file():
 
 @app.route('/print/<batch_id>')
 def print_batch(batch_id):
-    orders_to_print = Order.query.filter_by(batch_id=batch_id).all()
+    orders_to_print = Order.query.options(joinedload(Order.company), joinedload(Order.courier)).filter_by(batch_id=batch_id).all()
     if not orders_to_print:
         flash('لا توجد أوردرات في هذه الدفعة لطباعتها', 'warning')
         return redirect(url_for('index', tab='orders'))
@@ -814,7 +814,7 @@ def bulk_action():
         flash('لم يتم تحديد أي أوردر!', 'danger')
         return redirect(url_for('index', tab='orders'))
         
-    orders_to_update = Order.query.filter(Order.id.in_(order_ids)).all()
+    orders_to_update = Order.query.options(joinedload(Order.company), joinedload(Order.courier)).filter(Order.id.in_(order_ids)).all()
         
     if action == 'delete':
         Order.query.filter(Order.id.in_(order_ids)).delete(synchronize_session=False)

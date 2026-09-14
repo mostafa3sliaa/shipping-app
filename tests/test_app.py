@@ -10,7 +10,14 @@ def client():
     with app.test_client() as client:
         with app.app_context():
             db.create_all()
-            yield client
+            from werkzeug.security import generate_password_hash
+            from app import User
+            if not User.query.filter_by(username='admin').first():
+                db.session.add(User(username='admin', password_hash=generate_password_hash('admin123')))
+                db.session.commit()
+            
+        client.post('/login', data={'username': 'admin', 'password': 'admin123'})
+        yield client
         
         with app.app_context():
             db.drop_all()
@@ -38,7 +45,7 @@ def test_create_order(client):
     
     assert response.status_code == 200
     with app.app_context():
-        order = Order.query.filter_by(tracking_number='TRK123').first()
+        order = Order.query.filter_by(phone='010123').first()
         assert order is not None
         assert order.cod == 1000
 
@@ -59,7 +66,7 @@ def test_company_settlement(client):
     
     assert response.status_code == 200
     with app.app_context():
-        o = Order.query.get(1)
+        o = db.session.get(Order, 1)
         assert o.company_settled == True
 
 def test_treasury_payment(client):
