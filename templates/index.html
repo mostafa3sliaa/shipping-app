@@ -350,9 +350,9 @@
         <form action="{{ url_for('bulk_action') }}" method="POST" id="bulkForm">
             <div class="mb-2 d-flex justify-content-between align-items-center bg-light p-3 rounded border shadow-sm">
                 <div>
-                    <div class="form-check d-inline-block me-3">
-                        <input class="form-check-input border-secondary" type="checkbox" id="selectAll">
-                        <label class="form-check-label fw-bold" for="selectAll">تحديد الكل</label>
+                    <div class="form-check d-inline-flex align-items-center me-3 m-0">
+                        <input class="form-check-input border-secondary" type="checkbox" id="selectAll" onchange="toggleAllOrders(this)" style="cursor: pointer; width: 1.2em; height: 1.2em;">
+                        <label class="form-check-label fw-bold user-select-none ms-1" for="selectAll" style="cursor: pointer;">تحديد الكل</label>
                     </div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
@@ -413,7 +413,9 @@
                         <table class="table table-hover table-striped mb-0 align-middle">
                             <thead class="table-dark sticky-top">
                                 <tr>
-                                    <th class="py-3 px-3" style="width: 40px;"></th>
+                                    <th class="py-3 px-3" style="width: 40px;">
+                                        <input class="form-check-input border-secondary" type="checkbox" id="selectAllHeader" onchange="toggleAllOrders(this)" title="تحديد الكل" style="cursor: pointer;">
+                                    </th>
                                     <th class="py-3 px-2"><i class="fa-solid fa-barcode me-1"></i> البوليصة</th>
                                     <th class="py-3">التاريخ</th>
                                     <th class="py-3"><i class="fa-solid fa-building me-1"></i> الشركة</th>
@@ -928,12 +930,45 @@
     }
 
     // Select all checkboxes logic
-    const selectAllBtn = document.getElementById('selectAll');
-    if (selectAllBtn) {
-        selectAllBtn.addEventListener('change', function() {
-            const checkboxes = document.querySelectorAll('.order-checkbox');
-            for (let checkbox of checkboxes) {
-                checkbox.checked = this.checked;
+    function toggleAllOrders(master) {
+        if (!master) return;
+        var isChecked = master.checked;
+        var checkboxes = document.querySelectorAll('.order-checkbox');
+        for (var i = 0; i < checkboxes.length; i++) {
+            checkboxes[i].checked = isChecked;
+        }
+        var masters = document.querySelectorAll('#selectAll, #selectAllHeader');
+        for (var j = 0; j < masters.length; j++) {
+            masters[j].checked = isChecked;
+        }
+    }
+
+    function updateSelectAllState() {
+        var checkboxes = document.querySelectorAll('.order-checkbox');
+        if (checkboxes.length === 0) return;
+        var allChecked = true;
+        for (var i = 0; i < checkboxes.length; i++) {
+            if (!checkboxes[i].checked) {
+                allChecked = false;
+                break;
+            }
+        }
+        var masters = document.querySelectorAll('#selectAll, #selectAllHeader');
+        for (var j = 0; j < masters.length; j++) {
+            masters[j].checked = allChecked;
+        }
+    }
+
+    window.toggleAllOrders = toggleAllOrders;
+    window.updateSelectAllState = updateSelectAllState;
+
+    if (!window._selectAllListenerAttached) {
+        window._selectAllListenerAttached = true;
+        document.addEventListener('change', function(e) {
+            if (e.target && (e.target.id === 'selectAll' || e.target.id === 'selectAllHeader')) {
+                toggleAllOrders(e.target);
+            } else if (e.target && e.target.classList && e.target.classList.contains('order-checkbox')) {
+                updateSelectAllState();
             }
         });
     }
@@ -1088,7 +1123,15 @@
                             const newRows = doc.querySelectorAll('#orders-tbody tr');
                             const tbody = document.getElementById('orders-tbody');
                             if (tbody && newRows.length > 0) {
-                                newRows.forEach(row => tbody.appendChild(row));
+                                const master = document.getElementById('selectAll');
+                                const isMasterChecked = master && master.checked;
+                                newRows.forEach(row => {
+                                    if (isMasterChecked) {
+                                        const cb = row.querySelector('.order-checkbox');
+                                        if (cb) cb.checked = true;
+                                    }
+                                    tbody.appendChild(row);
+                                });
                             }
                             
                             // Update or remove trigger

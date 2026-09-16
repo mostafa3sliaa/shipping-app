@@ -32,9 +32,9 @@
 <form action="{{ url_for('bulk_action') }}" method="POST" id="bulkForm">
     <div class="mb-3 d-flex justify-content-between align-items-center">
         <div>
-            <div class="form-check d-inline-block me-3">
-                <input class="form-check-input border-secondary" type="checkbox" id="selectAll">
-                <label class="form-check-label fw-bold" for="selectAll">تحديد الكل</label>
+            <div class="form-check d-inline-flex align-items-center me-3 m-0">
+                <input class="form-check-input border-secondary" type="checkbox" id="selectAll" onchange="toggleAllOrders(this)" style="cursor: pointer; width: 1.2em; height: 1.2em;">
+                <label class="form-check-label fw-bold user-select-none ms-1" for="selectAll" style="cursor: pointer;">تحديد الكل</label>
             </div>
             <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger" onclick="return confirm('هل أنت متأكد من مسح الأوردرات المحددة؟');">
                 <i class="fa-solid fa-trash me-1"></i> مسح المحدد
@@ -49,7 +49,9 @@
                 <table class="table table-hover table-striped mb-0 align-middle">
                     <thead class="table-dark sticky-top">
                         <tr>
-                            <th class="py-3 px-3" style="width: 40px;"></th>
+                            <th class="py-3 px-3" style="width: 40px;">
+                                <input class="form-check-input border-secondary" type="checkbox" id="selectAllHeader" onchange="toggleAllOrders(this)" title="تحديد الكل" style="cursor: pointer;">
+                            </th>
                             <th class="py-3 px-2"><i class="fa-solid fa-barcode me-1"></i> البوليصة</th>
                             <th class="py-3"><i class="fa-solid fa-building me-1"></i> الشركة</th>
                             <th class="py-3"><i class="fa-solid fa-user me-1"></i> العميل</th>
@@ -116,11 +118,17 @@
 {% endfor %}
 
 <script>
-    document.getElementById('selectAll').addEventListener('change', function() {
-        const checkboxes = document.querySelectorAll('.order-checkbox');
-        for (let checkbox of checkboxes) {
-            checkbox.checked = this.checked;
+    function toggleAllOrders(master) {
+        if (!master) return;
+        var isChecked = master.checked;
+        var checkboxes = document.querySelectorAll('.order-checkbox');
+        for (var i = 0; i < checkboxes.length; i++) {
+            checkboxes[i].checked = isChecked;
         }
-    });
+        var masters = document.querySelectorAll('#selectAll, #selectAllHeader');
+        for (var j = 0; j < masters.length; j++) {
+            masters[j].checked = isChecked;
+        }
+    }
 </script>
 {% endblock %}
