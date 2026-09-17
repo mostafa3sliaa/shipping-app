@@ -847,21 +847,11 @@
             }
         }
 
-        // Region detection
+        // Region (only if explicitly written in quick paste)
         const regionInput = modal.querySelector('input[name="region"]');
         if (regionInput) {
             if (data.region.length > 0) {
                 regionInput.value = data.region.join(' ');
-            } else if (addressText && (!regionInput.value || regionInput.value.trim() === '')) {
-                const regionOptions = Array.from(document.querySelectorAll('#regions_list option')).map(o => o.value.trim()).filter(Boolean);
-                const commonGovs = ['اكتوبر', 'أكتوبر', '6 اكتوبر', '٦ اكتوبر', 'الشيخ زايد', 'القاهرة', 'الجيزة', 'الإسكندرية', 'الاسكندرية', 'القليوبية', 'المنوفية', 'الشرقية', 'الغربية', 'الدقهلية', 'دمياط', 'كفر الشيخ', 'البحيرة', 'الإسماعيلية', 'الاسماعيلية', 'السويس', 'بورسعيد', 'الفيوم', 'بني سويف', 'المنيا', 'أسيوط', 'اسيوط', 'سوهاج', 'قنا', 'الأقصر', 'الاقصر', 'أسوان', 'اسوان', 'البحر الأحمر', 'الوادي الجديد', 'مطروح', 'شمال سيناء', 'جنوب سيناء', 'حلوان', 'المعادي', 'مدينة نصر', 'مصر الجديدة', 'التجمع الخامس', 'التجمع', 'الشروق', 'بدر', 'العبور', 'مدينتي', 'الرحاب', 'شبرا', 'فيصل', 'الهرم', 'المقطم', 'عين شمس', 'الزيتون', 'حدائق الاهرام', 'حدائق الأهرام', 'المعادى', 'المهندسين', 'الدقي'];
-                const allCandidates = [...new Set([...regionOptions, ...commonGovs])].sort((a, b) => b.length - a.length);
-                for (const cand of allCandidates) {
-                    if (addressText.includes(cand)) {
-                        regionInput.value = cand;
-                        break;
-                    }
-                }
             }
         }
     }
