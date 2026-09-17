@@ -26,7 +26,8 @@ if db_url:
         'pool_size': 5,
         'max_overflow': 10,
         'pool_recycle': 300,
-        'pool_pre_ping': True
+        'pool_pre_ping': True,
+        'pool_timeout': 10
     }
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
@@ -70,10 +71,10 @@ class Courier(db.Model):
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     tracking_number = db.Column(db.String(50), unique=True, nullable=False)
-    client_name = db.Column(db.String(100))
-    phone = db.Column(db.String(150))
-    address = db.Column(db.String(255))
-    region = db.Column(db.String(100))
+    client_name = db.Column(db.Text)
+    phone = db.Column(db.Text)
+    address = db.Column(db.Text)
+    region = db.Column(db.Text)
     cod = db.Column(db.Float, default=0.0)
     shipping_fee = db.Column(db.Float, default=70.0)
     status = db.Column(db.String(50), default='مخزن')
