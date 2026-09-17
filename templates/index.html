@@ -411,23 +411,6 @@
                 <div class="card-body p-0">
                     <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
                         <table class="table table-hover table-striped mb-0 align-middle">
-                            <thead class="table-dark sticky-top">
-                                <tr>
-                                    <th class="py-3 px-3" style="width: 40px;">
-                                        <input class="form-check-input border-secondary" type="checkbox" id="selectAllHeader" onchange="toggleAllOrders(this)" title="تحديد الكل" style="cursor: pointer;">
-                                    </th>
-                                    <th class="py-3 px-2"><i class="fa-solid fa-barcode me-1"></i> البوليصة</th>
-                                    <th class="py-3">التاريخ</th>
-                                    <th class="py-3"><i class="fa-solid fa-building me-1"></i> الشركة</th>
-                                    <th class="py-3"><i class="fa-solid fa-user me-1"></i> العميل</th>
-                                    <th class="py-3"><i class="fa-solid fa-map-location-dot me-1"></i> العنوان</th>
-                                    <th class="py-3">المحتوى</th>
-                                    <th class="py-3"><i class="fa-solid fa-money-bill-1-wave me-1"></i> م.تحصيل</th>
-                                    <th class="py-3"><i class="fa-solid fa-truck-fast me-1"></i> م.شحن</th>
-                                    <th class="py-3"><i class="fa-solid fa-circle-info me-1"></i> الحالة</th>
-                                    <th class="py-3 text-center"><i class="fa-solid fa-gear me-1"></i> إجراء</th>
-                                </tr>
-                            </thead>
                             <tbody id="orders-tbody">
                                 {% for order in orders %}
                                 <tr id="order-row-{{ order.id }}" class="{% if order.is_copied %}bg-success bg-opacity-25{% elif order.phone in duplicate_phones %}bg-danger bg-opacity-10 border-danger border-2{% else %}bg-white{% endif %}">
