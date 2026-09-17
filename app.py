@@ -858,6 +858,19 @@ def bulk_action():
         for order in orders_to_update:
             order.region = region_name
         flash(f'تم تعيين المنطقة ({region_name}) لـ {len(order_ids)} أوردر', 'success')
+    elif action == 'set_shipping_fee':
+        fee_raw = request.form.get('bulk_shipping_fee')
+        if fee_raw is None or fee_raw.strip() == '':
+            flash('يجب كتابة سعر الشحن الجديد.', 'danger')
+            return redirect(url_for('index', tab='orders'))
+        try:
+            new_fee = float(fee_raw.strip())
+        except ValueError:
+            flash('سعر الشحن يجب أن يكون رقماً صحيحاً.', 'danger')
+            return redirect(url_for('index', tab='orders'))
+        for order in orders_to_update:
+            order.shipping_fee = new_fee
+        flash(f'تم تعديل سعر الشحن إلى ({new_fee} ج.م) لـ {len(order_ids)} أوردر بنجاح', 'success')
     elif action == 'return_company':
         for order in orders_to_update:
             order.status = 'مرتجع شركة'

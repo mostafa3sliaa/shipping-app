@@ -376,6 +376,13 @@
                             <i class="fa-solid fa-map-location-dot me-1"></i> تعيين
                         </button>
                     </div>
+
+                    <div class="input-group input-group-sm" style="width: 195px;">
+                        <input type="number" step="0.5" name="bulk_shipping_fee" class="form-control border-secondary fw-bold" placeholder="سعر الشحن..." onkeypress="if(event.key === 'Enter'){ event.preventDefault(); document.getElementById('mainBulkActionField').value='set_shipping_fee'; this.form.submit(); }">
+                        <button type="submit" class="btn btn-outline-secondary fw-bold" onclick="document.getElementById('mainBulkActionField').value='set_shipping_fee'">
+                            <i class="fa-solid fa-truck-fast me-1"></i> تعديل
+                        </button>
+                    </div>
                     
                     <button type="submit" class="btn btn-sm btn-primary fw-bold" onclick="document.getElementById('mainBulkActionField').value='warehouse'">
                         <i class="fa-solid fa-warehouse me-1"></i> مخزن

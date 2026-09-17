@@ -86,3 +86,24 @@ def test_treasury_payment(client):
         tx = TreasuryTransaction.query.first()
         assert tx is not None
         assert tx.amount == -500
+
+def test_bulk_set_shipping_fee(client):
+    with app.app_context():
+        o1 = Order(tracking_number='TRK-BULK-1', shipping_fee=50.0)
+        o2 = Order(tracking_number='TRK-BULK-2', shipping_fee=60.0)
+        db.session.add_all([o1, o2])
+        db.session.commit()
+        id1, id2 = o1.id, o2.id
+
+    response = client.post('/orders/bulk_action', data={
+        'action': 'set_shipping_fee',
+        'order_ids': [str(id1), str(id2)],
+        'bulk_shipping_fee': '75.5'
+    }, follow_redirects=True)
+
+    assert response.status_code == 200
+    with app.app_context():
+        res1 = db.session.get(Order, id1)
+        res2 = db.session.get(Order, id2)
+        assert res1.shipping_fee == 75.5
+        assert res2.shipping_fee == 75.5
