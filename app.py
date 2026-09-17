@@ -8,6 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from sqlalchemy.orm import joinedload
 from sqlalchemy import or_, text
+from sqlalchemy.pool import NullPool
 from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -23,11 +24,10 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///shipping.db'
 
 if db_url:
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_size': 5,
-        'max_overflow': 10,
-        'pool_recycle': 300,
-        'pool_pre_ping': True,
-        'pool_timeout': 10
+        'poolclass': NullPool,
+        'connect_args': {
+            'connect_timeout': 10
+        }
     }
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
