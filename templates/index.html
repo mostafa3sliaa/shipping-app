@@ -692,7 +692,7 @@
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">المنطقة (اختياري)</label>
-                        <input type="text" name="region" class="form-control">
+                        <input type="text" name="region" list="regions_list" class="form-control">
                     </div>
                     <div class="mb-3">
                         <label class="form-label fw-bold">العنوان بالكامل</label>
@@ -723,47 +723,165 @@
 </div>
 
 <script>
-    // Quick Paste Parser Logic
+    // Quick Paste Parser Logic (Multi-line section-aware parser)
+    function handleQuickPaste(text) {
+        if (!text || !text.trim()) return;
+
+        // 1. Convert Arabic numbers to English numbers
+        const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+        text = text.replace(/[٠-٩]/g, function(w) {
+            return arabicNumbers.indexOf(w);
+        });
+
+        const sections = {
+            client: ['العميل', 'اسم العميل', 'الاسم', 'اسم'],
+            phone: ['الهاتف', 'الموبايل', 'التليفون', 'تليفون', 'موبايل', 'فون', 'رقم الهاتف', 'رقم التليفون', 'رقم التواصل', 'الرقم', 'رقم', 'ت'],
+            address: ['العنوان', 'عنوان العميل', 'عنوان', 'مكان التوصيل', 'المكان', 'لوكيشن', 'location', 'address'],
+            region: ['المنطقة', 'منطقة', 'المحافظة', 'محافظة', 'المدينة', 'مدينة'],
+            content: ['المنتج', 'المنتجات', 'المحتوى', 'تفاصيل', 'تفاصيل الاوردر', 'تفاصيل الأوردر', 'الاوردر', 'الأوردر', 'اوردر', 'أوردر', 'الطلب', 'الصنف', 'الاصناف', 'الأصناف', 'محتويات'],
+            cod: ['السعر', 'المبلغ', 'الحساب', 'المطلوب', 'المطلوب تحصيله', 'التحصيل', 'مبلغ التحصيل', 'اجمالي', 'إجمالي', 'الاجمالي', 'الإجمالي', 'صافي', 'الصافي', 'cod', 'price', 'total'],
+            shipping: ['الشحن', 'مصاريف الشحن', 'سعر الشحن', 'توصيل', 'shipping'],
+            company: ['الشركة', 'اسم الشركة', 'شركة', 'بيدج', 'صفحة', 'page', 'company']
+        };
+
+        // Flatten all keywords for inline splitting if needed
+        const allKeywords = [];
+        for (const key in sections) {
+            allKeywords.push(...sections[key]);
+        }
+        allKeywords.sort((a, b) => b.length - a.length);
+
+        // If text contains inline labels separated by ' - ' or ' | ' or commas, break them onto new lines
+        const kwRegex = new RegExp('[\\s|,\\-]+(?=(?:' + allKeywords.map(k => k.replace(/[-\\/\\^$*+?.()|[\\]{}]/g, '\\$&')).join('|') + ')[\\s:\\-=])', 'gi');
+        text = text.replace(kwRegex, '\n');
+
+        const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+
+        const data = {
+            client: [],
+            phone: [],
+            address: [],
+            region: [],
+            content: [],
+            cod: [],
+            shipping: [],
+            company: []
+        };
+
+        let currentSection = null;
+
+        for (const line of lines) {
+            let matchedSection = null;
+            let matchedVal = '';
+
+            for (const sec in sections) {
+                const pattern = new RegExp('^(?:' + sections[sec].map(k => k.replace(/[-\\/\\^$*+?.()|[\\]{}]/g, '\\$&')).join('|') + ')[\\s:\\-=]*(.*)$', 'i');
+                const m = line.match(pattern);
+                if (m) {
+                    matchedSection = sec;
+                    matchedVal = m[1].trim();
+                    break;
+                }
+            }
+
+            if (matchedSection) {
+                currentSection = matchedSection;
+                if (matchedVal) {
+                    data[matchedSection].push(matchedVal);
+                }
+            } else if (currentSection) {
+                data[currentSection].push(line);
+            } else {
+                if (line.match(/^01[0125]\d{8}/)) {
+                    data.phone.push(line);
+                    currentSection = 'phone';
+                }
+            }
+        }
+
+        const modal = document.getElementById('newOrderModal');
+        if (!modal) return;
+
+        if (data.client.length > 0) {
+            const el = modal.querySelector('input[name="client_name"]');
+            if (el) el.value = data.client.join(' ');
+        }
+
+        if (data.phone.length > 0) {
+            const el = modal.querySelector('input[name="phone"]');
+            if (el) el.value = data.phone.join(' / ');
+        }
+
+        let addressText = '';
+        if (data.address.length > 0) {
+            addressText = data.address.join('\n');
+            const el = modal.querySelector('textarea[name="address"]');
+            if (el) el.value = addressText;
+        }
+
+        if (data.content.length > 0) {
+            const el = modal.querySelector('textarea[name="content"]');
+            if (el) el.value = data.content.join('\n');
+        }
+
+        if (data.company.length > 0) {
+            const el = modal.querySelector('input[name="company_name"]');
+            if (el) el.value = data.company.join(' ');
+        }
+
+        if (data.cod.length > 0) {
+            const rawCod = data.cod.join(' ');
+            const m = rawCod.match(/(\d+(?:\.\d+)?)/);
+            if (m) {
+                const el = modal.querySelector('input[name="cod"]');
+                if (el) el.value = m[1];
+            }
+        }
+
+        if (data.shipping.length > 0) {
+            const rawShip = data.shipping.join(' ');
+            const m = rawShip.match(/(\d+(?:\.\d+)?)/);
+            if (m) {
+                const el = modal.querySelector('input[name="shipping_fee"]');
+                if (el) el.value = m[1];
+            }
+        }
+
+        // Region detection
+        const regionInput = modal.querySelector('input[name="region"]');
+        if (regionInput) {
+            if (data.region.length > 0) {
+                regionInput.value = data.region.join(' ');
+            } else if (addressText && (!regionInput.value || regionInput.value.trim() === '')) {
+                const regionOptions = Array.from(document.querySelectorAll('#regions_list option')).map(o => o.value.trim()).filter(Boolean);
+                const commonGovs = ['اكتوبر', 'أكتوبر', '6 اكتوبر', '٦ اكتوبر', 'الشيخ زايد', 'القاهرة', 'الجيزة', 'الإسكندرية', 'الاسكندرية', 'القليوبية', 'المنوفية', 'الشرقية', 'الغربية', 'الدقهلية', 'دمياط', 'كفر الشيخ', 'البحيرة', 'الإسماعيلية', 'الاسماعيلية', 'السويس', 'بورسعيد', 'الفيوم', 'بني سويف', 'المنيا', 'أسيوط', 'اسيوط', 'سوهاج', 'قنا', 'الأقصر', 'الاقصر', 'أسوان', 'اسوان', 'البحر الأحمر', 'الوادي الجديد', 'مطروح', 'شمال سيناء', 'جنوب سيناء', 'حلوان', 'المعادي', 'مدينة نصر', 'مصر الجديدة', 'التجمع الخامس', 'التجمع', 'الشروق', 'بدر', 'العبور', 'مدينتي', 'الرحاب', 'شبرا', 'فيصل', 'الهرم', 'المقطم', 'عين شمس', 'الزيتون', 'حدائق الاهرام', 'حدائق الأهرام', 'المعادى', 'المهندسين', 'الدقي'];
+                const allCandidates = [...new Set([...regionOptions, ...commonGovs])].sort((a, b) => b.length - a.length);
+                for (const cand of allCandidates) {
+                    if (addressText.includes(cand)) {
+                        regionInput.value = cand;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    window.handleQuickPaste = handleQuickPaste;
+
+    // Attach listeners: direct on element & delegation on document for Turbo compatibility
     (function() {
         const pasteArea = document.getElementById('quickPasteArea');
         if (pasteArea) {
             pasteArea.addEventListener('input', function(e) {
-                let text = e.target.value;
-                if (!text.trim()) return;
-                
-                // Convert Arabic numbers to English numbers
-                const arabicNumbers = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
-                text = text.replace(/[٠-٩]/g, function(w) {
-                    return arabicNumbers.indexOf(w);
-                });
-                
-                // Helper to extract using regex (till end of line)
-                const getMatch = (regex) => {
-                    const match = text.match(regex);
-                    return match ? match[1].trim() : '';
-                };
-                
-                // Matches "العميل: Sahar Ahmed"
-                const client = getMatch(/(?:العميل|الاسم|اسم العميل)[\s:\-]*([^\n]+)/i);
-                if (client) document.querySelector('#newOrderModal input[name="client_name"]').value = client;
-                
-                // Matches "الهاتف: 01223272833 / 0101111"
-                const phone = getMatch(/(?:الهاتف|الموبايل|رقم|تليفون|ت)[\s:\-]*([^\n]+)/i);
-                if (phone) document.querySelector('#newOrderModal input[name="phone"]').value = phone;
-                
-                // Matches "العنوان: الجيزة - شارع جمال..."
-                const address = getMatch(/(?:العنوان)[\s:\-]*([^\n]+)/i);
-                if (address) {
-                    document.querySelector('#newOrderModal textarea[name="address"]').value = address;
+                handleQuickPaste(e.target.value);
+            });
+        }
+        if (!window._quickPasteListenerAttached) {
+            window._quickPasteListenerAttached = true;
+            document.addEventListener('input', function(e) {
+                if (e.target && e.target.id === 'quickPasteArea') {
+                    handleQuickPaste(e.target.value);
                 }
-                
-                // Matches "المنتج: lady fashion — مقاس 2..."
-                const product = getMatch(/(?:المنتج|المحتوى|تفاصيل|الاوردر)[\s:\-]*([^\n]+)/i);
-                if (product) document.querySelector('#newOrderModal textarea[name="content"]').value = product;
-                
-                // Matches "السعر: 570 يضيفه هو" - extract the first number after the keyword
-                const priceMatch = text.match(/(?:السعر|المبلغ|التحصيل|cod|الحساب)[\s:\-]*.*?(\d+(\.\d+)?)/i);
-                if (priceMatch) document.querySelector('#newOrderModal input[name="cod"]').value = priceMatch[1];
             });
         }
     })();
