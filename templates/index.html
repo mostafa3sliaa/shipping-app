@@ -91,57 +91,92 @@
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-md-3 mb-4">
-                <div class="card bg-light border-0 shadow-sm h-100">
-                    <div class="card-body d-flex justify-content-between align-items-center">
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-5 g-3 mb-4">
+            <!-- 1. Total Capital -->
+            <div class="col">
+                <div class="card text-white border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #1e3c72, #2a5298) !important;">
+                    <div class="card-body d-flex justify-content-between align-items-center p-3">
                         <div>
-                            <h5 class="fw-bold text-muted">البضاعة القائمة (لم تسلم)</h5>
-                            <h3 class="fw-bold text-warning mb-0">{{ "{:,.2f}".format(total_goods) }} ج.م</h3>
+                            <h6 class="fw-bold text-white-50 mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-coins me-1"></i> إجمالي رأس المال</h6>
+                            <h3 class="fw-bold text-white mb-0" style="font-size: 1.45rem;">{{ "{:,.2f}".format(total_capital) }} ج.م</h3>
+                            <small class="text-white-50 d-block mt-1" style="font-size: 0.72rem;">(خزينة + محفظة + بضاعة)</small>
+                        </div>
+                        <i class="fa-solid fa-sack-dollar fa-2x text-white opacity-25"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2. Goods in Inventory -->
+            <div class="col">
+                <div class="card bg-light border-0 shadow-sm h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center p-3">
+                        <div>
+                            <h6 class="fw-bold text-muted mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-boxes-stacked me-1"></i> البضاعة القائمة</h6>
+                            <h3 class="fw-bold text-warning mb-0" style="font-size: 1.45rem;">{{ "{:,.2f}".format(total_goods) }} ج.م</h3>
                             {% if partial_goods is defined and partial_goods > 0 %}
-                            <small class="text-muted d-block mt-1" style="font-size: 0.78rem;">منها <strong class="text-dark">{{ "{:,.2f}".format(partial_goods) }} ج.م</strong> مرتجع جزئي بالمخزن</small>
+                            <small class="text-muted d-block mt-1" style="font-size: 0.72rem;">منها <strong>{{ "{:,.2f}".format(partial_goods) }}</strong> مرتجع جزئي</small>
+                            {% else %}
+                            <small class="text-muted d-block mt-1" style="font-size: 0.72rem;">(بالمخزن ومع المناديب)</small>
                             {% endif %}
                         </div>
-                        <i class="fa-solid fa-boxes-stacked fa-3x text-warning opacity-25"></i>
+                        <i class="fa-solid fa-boxes-stacked fa-2x text-warning opacity-25"></i>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+
+            <!-- 3. Cash Treasury -->
+            <div class="col">
                 <div class="card bg-light border-0 shadow-sm h-100">
-                    <div class="card-body d-flex justify-content-between align-items-center">
+                    <div class="card-body d-flex justify-content-between align-items-center p-3">
                         <div>
-                            <h5 class="fw-bold text-muted">الخزينة (كاش)</h5>
-                            <h3 class="fw-bold text-success mb-0">{{ "{:,.2f}".format(treasury_cash) }} ج.م</h3>
+                            <h6 class="fw-bold text-muted mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-vault me-1"></i> الخزينة (كاش)</h6>
+                            <h3 class="fw-bold text-success mb-0" style="font-size: 1.45rem;">{{ "{:,.2f}".format(treasury_cash) }} ج.م</h3>
                         </div>
-                        <div class="text-end">
-                            <i class="fa-solid fa-vault fa-3x text-success opacity-25 d-block mb-2"></i>
-                            <button type="button" class="btn btn-sm btn-outline-success fw-bold" data-bs-toggle="modal" data-bs-target="#depositModal" onclick="document.getElementById('depositMethod').value='كاش'; document.getElementById('depositMethodDisplay').value='كاش (في الخزينة)';">+ إيداع</button>
+                        <div class="text-end" style="min-width: 85px;">
+                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold d-block mb-1 w-100" style="font-size: 0.72rem; padding: 2px 6px;" data-bs-toggle="modal" data-bs-target="#expenseModal">
+                                <i class="fa-solid fa-minus me-1"></i> مصروفات
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold d-block w-100" style="font-size: 0.72rem; padding: 2px 6px;" data-bs-toggle="modal" data-bs-target="#depositModal" onclick="document.getElementById('depositMethod').value='كاش'; document.getElementById('depositMethodDisplay').value='كاش (في الخزينة)';">
+                                <i class="fa-solid fa-plus me-1"></i> إيداع
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+
+            <!-- 4. Transfer Wallet -->
+            <div class="col">
                 <div class="card bg-light border-0 shadow-sm h-100">
-                    <div class="card-body d-flex justify-content-between align-items-center">
+                    <div class="card-body d-flex justify-content-between align-items-center p-3">
                         <div>
-                            <h5 class="fw-bold text-muted">المحفظة (تحويل)</h5>
-                            <h3 class="fw-bold text-primary mb-0">{{ "{:,.2f}".format(treasury_transfer) }} ج.م</h3>
+                            <h6 class="fw-bold text-muted mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-building-columns me-1"></i> المحفظة (تحويل)</h6>
+                            <h3 class="fw-bold text-primary mb-0" style="font-size: 1.45rem;">{{ "{:,.2f}".format(treasury_transfer) }} ج.م</h3>
                         </div>
-                        <div class="text-end">
-                            <i class="fa-solid fa-building-columns fa-3x text-primary opacity-25 d-block mb-2"></i>
-                            <button type="button" class="btn btn-sm btn-outline-primary fw-bold" data-bs-toggle="modal" data-bs-target="#depositModal" onclick="document.getElementById('depositMethod').value='تحويل'; document.getElementById('depositMethodDisplay').value='تحويل (في المحفظة)';">+ إيداع</button>
+                        <div class="text-end" style="min-width: 85px;">
+                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold d-block mb-1 w-100" style="font-size: 0.72rem; padding: 2px 6px;" data-bs-toggle="modal" data-bs-target="#walletWithdrawModal">
+                                <i class="fa-solid fa-minus me-1"></i> سحب
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary fw-bold d-block w-100" style="font-size: 0.72rem; padding: 2px 6px;" data-bs-toggle="modal" data-bs-target="#depositModal" onclick="document.getElementById('depositMethod').value='تحويل'; document.getElementById('depositMethodDisplay').value='تحويل (في المحفظة)';">
+                                <i class="fa-solid fa-plus me-1"></i> إيداع
+                            </button>
                         </div>
                     </div>
                 </div>
             </div>
-            <div class="col-md-3 mb-4">
+
+            <!-- 5. Net Collected Profit -->
+            <div class="col">
                 <div class="card bg-dark text-white border-0 shadow-sm h-100" style="background: linear-gradient(45deg, #198754, #20c997) !important;">
-                    <div class="card-body d-flex justify-content-between align-items-center">
+                    <div class="card-body d-flex justify-content-between align-items-center p-3">
                         <div>
-                            <h5 class="fw-bold text-white-50">الأرباح (المُحصلة)</h5>
-                            <h3 class="fw-bold text-white mb-0">{{ "{:,.2f}".format(company_profit) }} ج.م</h3>
+                            <h6 class="fw-bold text-white-50 mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-chart-line me-1"></i> الأرباح (المُحصلة)</h6>
+                            <h3 class="fw-bold text-white mb-0" style="font-size: 1.45rem;">{{ "{:,.2f}".format(company_profit) }} ج.م</h3>
                         </div>
-                        <i class="fa-solid fa-chart-line fa-3x text-white opacity-25"></i>
+                        <div class="text-end">
+                            <button type="button" class="btn btn-sm btn-outline-light fw-bold shadow-sm" style="font-size: 0.75rem; padding: 3px 8px;" data-bs-toggle="modal" data-bs-target="#resetProfitModal" title="تصفير أرباح الدورة">
+                                <i class="fa-solid fa-rotate-left me-1"></i> تصفير
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -214,25 +249,33 @@
             </div>
             <div class="card-body p-0">
                 <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
-                    <table class="table table-hover mb-0">
+                    <table class="table table-hover mb-0 align-middle">
                         <thead class="table-light sticky-top">
                             <tr>
                                 <th>التاريخ</th>
                                 <th>المبلغ (ج.م)</th>
-                                <th>جهة الإيداع</th>
-                                <th>ملاحظات</th>
+                                <th>نوع الحركة</th>
+                                <th>الجهة</th>
+                                <th>البيان / ملاحظات</th>
                             </tr>
                         </thead>
                         <tbody id="depositTableBody">
                             {% for tx in deposit_history %}
                             <tr class="deposit-row">
                                 <td><small class="text-muted">{{ tx.created_at.strftime('%Y-%m-%d %I:%M %p') }}</small></td>
-                                <td class="text-success fw-bold">+ {{ "{:,.2f}".format(tx.amount) }}</td>
-                                <td><span class="badge bg-{{ 'success' if tx.method == 'كاش' else 'primary' }}">{{ tx.method }}</span></td>
+                                <td class="fw-bold {% if tx.amount < 0 %}text-danger{% else %}text-success{% endif %}">
+                                    {{ "{:+,.2f}".format(tx.amount) }}
+                                </td>
+                                <td>
+                                    <span class="badge bg-{{ 'danger' if tx.tx_type in ['مصروفات', 'سحب_محفظة'] else 'dark' if tx.tx_type == 'تصفير_أرباح' else 'success' }}">
+                                        {{ tx.tx_type|replace('_', ' ') }}
+                                    </span>
+                                </td>
+                                <td><span class="badge bg-{{ 'success' if tx.method == 'كاش' else 'primary' if tx.method == 'تحويل' else 'secondary' }}">{{ tx.method }}</span></td>
                                 <td>{{ tx.notes or '-' }}</td>
                             </tr>
                             {% else %}
-                            <tr><td colspan="4" class="text-center text-muted py-3">لم يتم تسجيل أي إيداعات يدوية بعد</td></tr>
+                            <tr><td colspan="5" class="text-center text-muted py-3">لم يتم تسجيل أي حركات يدوية بعد</td></tr>
                             {% endfor %}
                         </tbody>
                     </table>
@@ -1197,6 +1240,102 @@
                         <input type="text" name="notes" class="form-control" placeholder="مثال: رصيد افتتاحي، إضافة من المالك...">
                     </div>
                     <button type="submit" class="btn btn-success btn-lg w-100 fw-bold">تأكيد الإيداع</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Expense Modal (خصم من الخزينة) -->
+<div class="modal fade" id="expenseModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-danger text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-receipt me-2"></i> تسجيل مصروفات (خصم من الخزينة)</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form method="POST" action="{{ url_for('treasury_expense') }}">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">المبلغ المراد صرفه (ج.م)</label>
+                        <input type="number" step="0.01" name="amount" class="form-control form-control-lg fw-bold text-danger" placeholder="0.00" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">جهة الخصم</label>
+                        <input type="text" class="form-control fw-bold bg-light text-danger" value="الخزينة (كاش)" readonly>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">بند / بيان المصروف</label>
+                        <input type="text" name="notes" class="form-control border-danger" placeholder="مثال: إيجار، بوفيه، بنزين، صيانة، رواتب، أدوات مكتبية..." required>
+                    </div>
+                    <button type="submit" class="btn btn-danger btn-lg w-100 fw-bold">
+                        <i class="fa-solid fa-minus-circle me-1"></i> تأكيد خصم المصروف
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Wallet Withdraw Modal (سحب من المحفظة) -->
+<div class="modal fade" id="walletWithdrawModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-warning text-dark border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-wallet me-2"></i> سحب من المحفظة (تحويل)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <form method="POST" action="{{ url_for('treasury_withdraw_wallet') }}">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">المبلغ المراد سحبه (ج.م)</label>
+                        <input type="number" step="0.01" name="amount" class="form-control form-control-lg fw-bold text-primary" placeholder="0.00" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">جهة السحب</label>
+                        <input type="text" class="form-control fw-bold bg-light text-primary" value="المحفظة (تحويل بنكي / فودافون كاش)" readonly>
+                    </div>
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">بيان السحب / ملاحظات</label>
+                        <input type="text" name="notes" class="form-control border-warning" placeholder="مثال: سحب كاش، تحويل لحساب شخصي...">
+                    </div>
+                    <button type="submit" class="btn btn-warning btn-lg w-100 fw-bold">
+                        <i class="fa-solid fa-arrow-down me-1"></i> تأكيد السحب من المحفظة
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Reset Profit Modal (تصفير الأرباح المحصلة) -->
+<div class="modal fade" id="resetProfitModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header bg-dark text-white border-0">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-rotate-left me-2"></i> تصفير عداد الأرباح المحصلة</h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="alert alert-info py-3 mb-3 border-0">
+                    <i class="fa-solid fa-circle-info fa-lg me-2 text-primary"></i>
+                    سيتم تصفير عداد الأرباح الحالية ليبدأ من الصفر لدورة حسابية جديدة.
+                    <div class="fw-bold mt-2 text-dark">
+                        <i class="fa-solid fa-shield-halved text-success me-1"></i> لن يتم خصم أي مبالغ من الخزينة أو المحفظة على الإطلاق.
+                    </div>
+                </div>
+                <div class="bg-light p-3 rounded mb-3 text-center border">
+                    <span class="text-muted d-block small">الأرباح المسجلة الحالية المراد تصفيرها:</span>
+                    <span class="fs-4 fw-bold text-success">{{ "{:,.2f}".format(company_profit) }} ج.م</span>
+                </div>
+                <form method="POST" action="{{ url_for('treasury_reset_profit') }}">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">ملاحظات / تسمية الدورة</label>
+                        <input type="text" name="notes" class="form-control" placeholder="مثال: تصفير أرباح شهر سبتمبر، تقفيل أسبوعي...">
+                    </div>
+                    <button type="submit" class="btn btn-dark btn-lg w-100 fw-bold">
+                        <i class="fa-solid fa-check me-1"></i> تأكيد تصفير الأرباح
+                    </button>
                 </form>
             </div>
         </div>

@@ -189,6 +189,12 @@ def index():
     ).scalar() or 0.0
     company_profit += partial_returned_company_profit
 
+    # Deduct previous profit resets so profit starts from 0 for the new cycle without touching treasury
+    total_profit_resets = db.session.query(
+        db.func.sum(TreasuryTransaction.amount)
+    ).filter_by(tx_type='تصفير_أرباح').scalar() or 0.0
+    company_profit = max(0.0, company_profit - total_profit_resets)
+
     total_goods = full_goods + partial_goods
     new_in_warehouse = status_dict.get('مخزن', 0)
     postponed = status_dict.get('مؤجل', 0)
@@ -201,6 +207,9 @@ def index():
     treasury_dict = dict(treasury_sums)
     treasury_cash = treasury_dict.get('كاش', 0.0)
     treasury_transfer = treasury_dict.get('تحويل', 0.0)
+    
+    # 3. Total Capital (خزينة كاش + محفظة تحويل + بضاعة قائمة)
+    total_capital = treasury_cash + treasury_transfer + total_goods
     
     active_couriers = Courier.query.count()
     
@@ -353,10 +362,10 @@ def index():
         if not scanned_orders:
             flash('لا يوجد أوردر مطابق للبحث!', 'danger')
             
-    # Fetch manual deposit history (only for dashboard)
+    # Fetch manual treasury transaction history (only for dashboard)
     if active_tab == 'dashboard':
-        deposit_history = TreasuryTransaction.query.filter_by(
-            tx_type='إيداع_يدوي'
+        deposit_history = TreasuryTransaction.query.filter(
+            TreasuryTransaction.tx_type.in_(['إيداع_يدوي', 'مصروفات', 'سحب_محفظة', 'تصفير_أرباح'])
         ).order_by(TreasuryTransaction.created_at.desc()).limit(50).all()
     else:
         deposit_history = []
@@ -364,6 +373,7 @@ def index():
     return render_template('index.html', 
                            total_orders=total_orders, 
                            total_goods=total_goods,
+                           total_capital=total_capital,
                            treasury_cash=treasury_cash,
                            treasury_transfer=treasury_transfer,
                            company_profit=company_profit,
@@ -1242,6 +1252,110 @@ def treasury_deposit():
     except Exception as e:
         db.session.rollback()
         flash('حدث خطأ أثناء تسجيل الإيداع.', 'danger')
+        
+    return redirect(url_for('index'))
+
+@app.route('/treasury/expense', methods=['POST'])
+@login_required
+def treasury_expense():
+    try:
+        amount = float(request.form.get('amount', 0))
+        notes = request.form.get('notes', 'مصروفات عامة').strip()
+        
+        if amount > 0:
+            tx = TreasuryTransaction(
+                amount=-amount,
+                method='كاش',
+                tx_type='مصروفات',
+                entity_id=None,
+                notes=notes or 'مصروفات عامة'
+            )
+            db.session.add(tx)
+            db.session.commit()
+            flash(f'تم تسجيل مصروفات بقيمة {amount:,.2f} ج.م وخصمها من الخزينة بنجاح!', 'success')
+        else:
+            flash('يجب إدخال مبلغ أكبر من الصفر.', 'danger')
+    except Exception as e:
+        db.session.rollback()
+        flash('حدث خطأ أثناء تسجيل المصروفات.', 'danger')
+        
+    return redirect(url_for('index'))
+
+@app.route('/treasury/withdraw_wallet', methods=['POST'])
+@login_required
+def treasury_withdraw_wallet():
+    try:
+        amount = float(request.form.get('amount', 0))
+        notes = request.form.get('notes', 'سحب من المحفظة').strip()
+        
+        if amount > 0:
+            tx = TreasuryTransaction(
+                amount=-amount,
+                method='تحويل',
+                tx_type='سحب_محفظة',
+                entity_id=None,
+                notes=notes or 'سحب من المحفظة'
+            )
+            db.session.add(tx)
+            db.session.commit()
+            flash(f'تم سحب مبلغ {amount:,.2f} ج.م من المحفظة بنجاح!', 'success')
+        else:
+            flash('يجب إدخال مبلغ أكبر من الصفر.', 'danger')
+    except Exception as e:
+        db.session.rollback()
+        flash('حدث خطأ أثناء تسجيل السحب من المحفظة.', 'danger')
+        
+    return redirect(url_for('index'))
+
+@app.route('/treasury/reset_profit', methods=['POST'])
+@login_required
+def treasury_reset_profit():
+    try:
+        metrics = db.session.query(
+            Order.status,
+            db.func.sum(Order.shipping_fee),
+            db.func.sum(Order.courier_fee)
+        ).group_by(Order.status).all()
+        
+        total_earned = 0.0
+        for st, shipping_sum, courier_fee_sum in metrics:
+            ship_s = shipping_sum or 0.0
+            fee_s = courier_fee_sum or 0.0
+            if st in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
+                total_earned += (ship_s - fee_s)
+                
+        partial_returned_company_profit = db.session.query(
+            db.func.sum(Order.shipping_fee - db.func.coalesce(Order.courier_fee, 0.0))
+        ).filter(
+            Order.status == 'مرتجع شركة',
+            Order.collected_amount > 0,
+            Order.courier_settled == True
+        ).scalar() or 0.0
+        total_earned += partial_returned_company_profit
+        
+        total_reset = db.session.query(
+            db.func.sum(TreasuryTransaction.amount)
+        ).filter_by(tx_type='تصفير_أرباح').scalar() or 0.0
+        
+        current_displayed_profit = max(0.0, total_earned - total_reset)
+        notes = request.form.get('notes', 'تصفير أرباح الدورة الحالية').strip()
+        
+        if current_displayed_profit > 0:
+            tx = TreasuryTransaction(
+                amount=current_displayed_profit,
+                method='أرباح',
+                tx_type='تصفير_أرباح',
+                entity_id=None,
+                notes=notes or 'تصفير أرباح الدورة الحالية'
+            )
+            db.session.add(tx)
+            db.session.commit()
+            flash(f'تم تصفير الأرباح المحصلة بقيمة ({current_displayed_profit:,.2f} ج.م) بنجاح دون أي مساس برصيد الخزينة!', 'success')
+        else:
+            flash('الأرباح مصفرة بالفعل.', 'info')
+    except Exception as e:
+        db.session.rollback()
+        flash('حدث خطأ أثناء تصفير الأرباح.', 'danger')
         
     return redirect(url_for('index'))
 

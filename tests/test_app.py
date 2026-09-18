@@ -259,3 +259,95 @@ def test_partial_delivery_flow_and_company_return(client):
     assert home2.status_code == 200
     assert b'20.00' in home2.data
 
+def test_treasury_expense(client):
+    with app.app_context():
+        # Add initial cash of 1000
+        db.session.add(TreasuryTransaction(amount=1000.0, method='كاش', tx_type='إيداع_يدوي'))
+        db.session.commit()
+
+    # Record expense of 150
+    response = client.post('/treasury/expense', data={
+        'amount': '150',
+        'notes': 'فاتورة كهرباء ومطبوعات'
+    }, follow_redirects=True)
+    assert response.status_code == 200
+
+    with app.app_context():
+        tx = TreasuryTransaction.query.filter_by(tx_type='مصروفات').first()
+        assert tx is not None
+        assert tx.amount == -150.0
+        assert tx.method == 'كاش'
+        
+        # Net cash should be 850
+        net_cash = db.session.query(db.func.sum(TreasuryTransaction.amount)).filter_by(method='كاش').scalar()
+        assert net_cash == 850.0
+
+def test_wallet_withdraw(client):
+    with app.app_context():
+        # Add initial transfer wallet balance of 500
+        db.session.add(TreasuryTransaction(amount=500.0, method='تحويل', tx_type='إيداع_يدوي'))
+        db.session.commit()
+
+    # Withdraw 200 from wallet
+    response = client.post('/treasury/withdraw_wallet', data={
+        'amount': '200',
+        'notes': 'سحب فودافون كاش'
+    }, follow_redirects=True)
+    assert response.status_code == 200
+
+    with app.app_context():
+        tx = TreasuryTransaction.query.filter_by(tx_type='سحب_محفظة').first()
+        assert tx is not None
+        assert tx.amount == -200.0
+        assert tx.method == 'تحويل'
+        
+        # Net wallet should be 300
+        net_transfer = db.session.query(db.func.sum(TreasuryTransaction.amount)).filter_by(method='تحويل').scalar()
+        assert net_transfer == 300.0
+
+def test_reset_profit_without_deducting_treasury(client):
+    with app.app_context():
+        # Add an order with profit 100
+        o = Order(
+            tracking_number='TRK-PROFIT-TEST',
+            cod=1000.0,
+            shipping_fee=150.0,
+            courier_fee=50.0,
+            collected_amount=1000.0,
+            status='تم التوصيل',
+            courier_settled=True
+        )
+        # Treasury cash received 950
+        tx = TreasuryTransaction(amount=950.0, method='كاش', tx_type='تحصيل_من_مندوب')
+        db.session.add_all([o, tx])
+        db.session.commit()
+
+    # Check dashboard: profit is 100 (150 - 50) and cash is 950
+    h1 = client.get('/')
+    assert h1.status_code == 200
+    assert b'100.00' in h1.data
+    assert b'950.00' in h1.data
+
+    # Now reset profit
+    res = client.post('/treasury/reset_profit', data={
+        'notes': 'تصفير دورة أسبوعية'
+    }, follow_redirects=True)
+    assert res.status_code == 200
+
+    # Check dashboard again: profit is 0.00, BUT cash is STILL 950.00!
+    h2 = client.get('/')
+    assert h2.status_code == 200
+    assert b'0.00' in h2.data
+    assert b'950.00' in h2.data
+
+    with app.app_context():
+        # Treasury cash must remain exactly 950.0
+        cash = db.session.query(db.func.sum(TreasuryTransaction.amount)).filter_by(method='كاش').scalar()
+        assert cash == 950.0
+        # Reset record exists with method='أرباح'
+        reset_tx = TreasuryTransaction.query.filter_by(tx_type='تصفير_أرباح').first()
+        assert reset_tx is not None
+        assert reset_tx.amount == 100.0
+        assert reset_tx.method == 'أرباح'
+
+
