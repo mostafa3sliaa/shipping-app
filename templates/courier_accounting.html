@@ -103,7 +103,9 @@
                                             <option value="مع المندوب">لم يُسلم بعد (مع المندوب)</option>
                                             <option value="تم التوصيل" {% if order.status in ['تم التوصيل', 'مع المندوب'] %}selected{% endif %}>تم التوصيل</option>
                                             <option value="تسليم جزئي / مرتجع" {% if order.status == 'تسليم جزئي / مرتجع' %}selected{% endif %}>تسليم جزئي / مرتجع</option>
-                                            <option value="مرتجع" {% if order.status == 'مرتجع' %}selected{% endif %}>مرتجع (بدون رسوم)</option>
+                                            <option value="مرتجع_مخزن">مرتجع للمخزن (بدون رسوم - هيطلع تاني)</option>
+                                            <option value="مرتجع" {% if order.status == 'مرتجع' %}selected{% endif %}>مرتجع نهائي (بدون رسوم)</option>
+                                            <option value="مرتجع شركة" {% if order.status == 'مرتجع شركة' %}selected{% endif %}>مرتجع للشركة (بدون رسوم)</option>
                                             <option value="مرتجع بشحن" {% if order.status == 'مرتجع بشحن' %}selected{% endif %}>مرتجع (بتحصيل شحن)</option>
                                             <option value="مؤجل" {% if order.status == 'مؤجل' %}selected{% endif %}>مؤجل</option>
                                         </select>
@@ -204,27 +206,34 @@
                             collectedInput.value = "0";
                             collectedInput.readOnly = true;
                             feeInput.value = "0";
-                            row.classList.remove('table-success', 'table-warning', 'table-danger');
+                            row.classList.remove('table-success', 'table-warning', 'table-danger', 'table-info');
                             row.classList.add('bg-light');
                         } else if (status === 'تم التوصيل') {
                             if (!manualCollected && collectedInput.value == "0") collectedInput.value = cod;
                             collectedInput.readOnly = false;
-                            row.classList.remove('bg-light', 'table-warning', 'table-danger');
+                            row.classList.remove('bg-light', 'table-warning', 'table-danger', 'table-info');
                             row.classList.add('table-success');
                         } else if (status === 'تسليم جزئي / مرتجع') {
                             if (!manualCollected && collectedInput.value == "0") collectedInput.value = cod;
                             collectedInput.readOnly = false;
-                            row.classList.remove('bg-light', 'table-success', 'table-danger');
+                            row.classList.remove('bg-light', 'table-success', 'table-danger', 'table-info');
                             row.classList.add('table-warning');
-                        } else if (status === 'مرتجع') {
+                        } else if (status === 'مرتجع_مخزن') {
                             collectedInput.value = "0";
                             collectedInput.readOnly = true;
-                            row.classList.remove('bg-light', 'table-success', 'table-warning');
+                            feeInput.value = "0";
+                            row.classList.remove('bg-light', 'table-success', 'table-warning', 'table-danger');
+                            row.classList.add('table-info');
+                        } else if (status === 'مرتجع' || status === 'مرتجع شركة') {
+                            collectedInput.value = "0";
+                            collectedInput.readOnly = true;
+                            feeInput.value = "0";
+                            row.classList.remove('bg-light', 'table-success', 'table-warning', 'table-info');
                             row.classList.add('table-danger');
                         } else if (status === 'مرتجع بشحن') {
                             if (!manualCollected && collectedInput.value == "0") collectedInput.value = shipping;
                             collectedInput.readOnly = false;
-                            row.classList.remove('bg-light', 'table-success', 'table-danger');
+                            row.classList.remove('bg-light', 'table-success', 'table-danger', 'table-info');
                             row.classList.add('table-warning');
                         }
                         

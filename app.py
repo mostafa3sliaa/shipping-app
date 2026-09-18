@@ -179,6 +179,16 @@ def index():
         if st in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
             company_profit += (ship_s - fee_s)
             
+    # Include shipping profit for partial delivery orders whose returned goods portion was transferred to 'مرتجع شركة'
+    partial_returned_company_profit = db.session.query(
+        db.func.sum(Order.shipping_fee - db.func.coalesce(Order.courier_fee, 0.0))
+    ).filter(
+        Order.status == 'مرتجع شركة',
+        Order.collected_amount > 0,
+        Order.courier_settled == True
+    ).scalar() or 0.0
+    company_profit += partial_returned_company_profit
+
     total_goods = full_goods + partial_goods
     new_in_warehouse = status_dict.get('مخزن', 0)
     postponed = status_dict.get('مؤجل', 0)
@@ -295,9 +305,12 @@ def index():
     couriers = Courier.query.order_by(Courier.name).all()
     companies = Company.query.order_by(Company.name).all()
     
-    # Active statuses in DB
+    # All canonical statuses for modals and forms
+    all_statuses = ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع', 'مرتجع شركة', 'مرتجع بشحن', 'مؤجل']
+    
+    # Active statuses in DB for filters
     db_statuses = [r[0] for r in db.session.query(Order.status).distinct().all()]
-    statuses = [s for s in ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع', 'مرتجع شركة', 'مرتجع بشحن'] if s in db_statuses]
+    statuses = [s for s in all_statuses if s in db_statuses]
     
     # Active regions in DB based on current filters (fast query without joinedload)
     region_query = Order.query
@@ -377,6 +390,8 @@ def index():
                            couriers=couriers,
                            companies=companies,
                            statuses=statuses,
+                           all_statuses=all_statuses,
+                           partial_goods=partial_goods,
                            active_tab=active_tab,
                            scanned_orders=scanned_orders,
                            scanned_query=scanned_tracking,
@@ -813,6 +828,17 @@ def scan():
 @app.route('/order/<int:order_id>/delete', methods=['POST'])
 def delete_order(order_id):
     order = Order.query.get_or_404(order_id)
+    if order.courier_settled:
+        net_amount = (order.collected_amount or 0.0) - (order.courier_fee or 0.0)
+        if net_amount > 0:
+            reversal_tx = TreasuryTransaction(
+                amount=-net_amount,
+                method='كاش',
+                tx_type='إلغاء_تسليم',
+                entity_id=order.courier_id,
+                notes=f'خصم من الخزينة لمسح الأوردر {order.tracking_number}'
+            )
+            db.session.add(reversal_tx)
     db.session.delete(order)
     db.session.commit()
     flash('تم مسح الأوردر بنجاح', 'success')
@@ -831,7 +857,19 @@ def bulk_action():
     orders_to_update = Order.query.options(joinedload(Order.company), joinedload(Order.courier)).filter(Order.id.in_(order_ids)).all()
         
     if action == 'delete':
-        Order.query.filter(Order.id.in_(order_ids)).delete(synchronize_session=False)
+        for order in orders_to_update:
+            if order.courier_settled:
+                net_amount = (order.collected_amount or 0.0) - (order.courier_fee or 0.0)
+                if net_amount > 0:
+                    reversal_tx = TreasuryTransaction(
+                        amount=-net_amount,
+                        method='كاش',
+                        tx_type='إلغاء_تسليم',
+                        entity_id=order.courier_id,
+                        notes=f'خصم من الخزينة لمسح الأوردر {order.tracking_number}'
+                    )
+                    db.session.add(reversal_tx)
+            db.session.delete(order)
         flash(f'تم مسح {len(order_ids)} أوردر بنجاح', 'success')
     elif action == 'assign_courier' and courier_name:
         # Check if courier exists, otherwise create
@@ -847,9 +885,23 @@ def bulk_action():
         flash(f'تم تسليم {len(order_ids)} أوردر للمندوب ({courier_name}) بنجاح!', 'success')
     elif action == 'warehouse':
         for order in orders_to_update:
+            net_amount = (order.collected_amount or 0.0) - (order.courier_fee or 0.0)
+            if order.courier_settled and net_amount > 0:
+                reversal_tx = TreasuryTransaction(
+                    amount=-net_amount,
+                    method='كاش',
+                    tx_type='استرجاع_مخزن',
+                    entity_id=order.courier_id,
+                    notes=f'خصم من الخزينة لاسترجاع الأوردر {order.tracking_number} للمخزن'
+                )
+                db.session.add(reversal_tx)
             order.status = 'مخزن'
             order.courier_id = None
-        flash(f'تم إرجاع {len(order_ids)} أوردر للمخزن', 'info')
+            order.courier_settled = False
+            order.company_settled = False
+            order.collected_amount = None
+            order.courier_fee = None
+        flash(f'تم إرجاع {len(order_ids)} أوردر للمخزن وتسوية الخزينة بنجاح', 'info')
     elif action == 'set_region':
         region_name = request.form.get('bulk_region_name')
         if not region_name:
@@ -900,11 +952,17 @@ def bulk_action():
 @app.route('/order/<int:order_id>/edit', methods=['POST'])
 def edit_order(order_id):
     order = Order.query.get_or_404(order_id)
+    old_status = order.status
+    old_settled = order.courier_settled
+    old_collected = order.collected_amount or 0.0
+    old_fee = order.courier_fee or 0.0
+    old_net = old_collected - old_fee
+    
     order.client_name = request.form.get('client_name', order.client_name)
     order.phone = request.form.get('phone', order.phone)
     order.address = request.form.get('address', order.address)
     order.region = request.form.get('region', order.region)
-    order.status = request.form.get('status', order.status)
+    new_status = request.form.get('status', order.status)
     order.content = request.form.get('content', order.content)
     
     company_name = request.form.get('company_name', '').strip()
@@ -947,6 +1005,67 @@ def edit_order(order_id):
             
     except ValueError:
         pass
+
+    order.status = new_status
+
+    # Status transitions & Treasury accounting logic
+    if new_status == 'مخزن':
+        # Reverting to warehouse: Reverse any courier collection from treasury
+        if old_settled and old_net > 0:
+            reversal_tx = TreasuryTransaction(
+                amount=-old_net,
+                method='كاش',
+                tx_type='استرجاع_مخزن',
+                entity_id=order.courier_id,
+                notes=f'خصم من الخزينة لاسترجاع الأوردر {order.tracking_number} للمخزن'
+            )
+            db.session.add(reversal_tx)
+        order.courier_settled = False
+        order.company_settled = False
+        order.collected_amount = None
+        order.courier_fee = None
+        order.courier_id = None
+    elif new_status in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
+        new_collected = order.collected_amount or 0.0
+        new_fee = order.courier_fee or 0.0
+        new_net = new_collected - new_fee
+        
+        if not old_settled and new_net > 0:
+            # First-time settlement via edit modal
+            tx = TreasuryTransaction(
+                amount=new_net,
+                method='كاش',
+                tx_type='تحصيل_من_مندوب',
+                entity_id=order.courier_id,
+                notes=f'تحصيل نقدي للأوردر {order.tracking_number} ({new_status})'
+            )
+            db.session.add(tx)
+            order.courier_settled = True
+        elif old_settled:
+            # Already settled before, adjust if amounts changed
+            diff = new_net - old_net
+            if diff != 0:
+                tx = TreasuryTransaction(
+                    amount=diff,
+                    method='كاش',
+                    tx_type='تعديل_تحصيل',
+                    entity_id=order.courier_id,
+                    notes=f'تعديل تحصيل للأوردر {order.tracking_number} (فارق {diff:+.2f} ج.م)'
+                )
+                db.session.add(tx)
+    elif new_status in ['مرتجع', 'مرتجع شركة']:
+        if old_settled and old_net > 0 and old_status in ['تم التوصيل']:
+            reversal_tx = TreasuryTransaction(
+                amount=-old_net,
+                method='كاش',
+                tx_type='إلغاء_تسليم',
+                entity_id=order.courier_id,
+                notes=f'خصم من الخزينة لتحويل الأوردر {order.tracking_number} إلى {new_status}'
+            )
+            db.session.add(reversal_tx)
+            order.courier_settled = True
+            order.collected_amount = 0.0
+            order.courier_fee = 0.0
     
     db.session.commit()
     flash('تم تعديل الأوردر بنجاح', 'success')
@@ -1238,9 +1357,15 @@ def courier_accounting():
                     for order in orders:
                         new_status = request.form.get(f'status_{order.id}')
                         if new_status and new_status != 'مع المندوب' and new_status != 'مؤجل':
-                            order.status = new_status
-                            
-                            if new_status in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
+                            if new_status == 'مرتجع_مخزن':
+                                order.status = 'مخزن'
+                                order.courier_id = None
+                                order.collected_amount = None
+                                order.courier_fee = None
+                                order.courier_settled = True
+                                settled_count += 1
+                            elif new_status in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
+                                order.status = new_status
                                 try:
                                     order.collected_amount = float(request.form.get(f'collected_{order.id}', 0))
                                 except:
@@ -1248,15 +1373,21 @@ def courier_accounting():
                                 try:
                                     order.courier_fee = float(request.form.get(f'courier_fee_{order.id}', 0))
                                 except:
-                                    pass
-                            elif new_status == 'مرتجع':
-                                order.collected_amount = 0
-                                order.courier_fee = 0
-                            
-                            order.courier_settled = True
-                            settled_count += 1
-                            batch_collected += (order.collected_amount or 0.0)
-                            batch_fee += (order.courier_fee or 0.0)
+                                    order.courier_fee = 0.0
+                                order.courier_settled = True
+                                settled_count += 1
+                                batch_collected += (order.collected_amount or 0.0)
+                                batch_fee += (order.courier_fee or 0.0)
+                            elif new_status in ['مرتجع', 'مرتجع شركة']:
+                                order.status = new_status
+                                order.collected_amount = 0.0
+                                try:
+                                    order.courier_fee = float(request.form.get(f'courier_fee_{order.id}', 0))
+                                except:
+                                    order.courier_fee = 0.0
+                                order.courier_settled = True
+                                settled_count += 1
+                                batch_fee += (order.courier_fee or 0.0)
                             
                     if settled_count > 0:
                         db.session.commit()

@@ -98,6 +98,9 @@
                         <div>
                             <h5 class="fw-bold text-muted">البضاعة القائمة (لم تسلم)</h5>
                             <h3 class="fw-bold text-warning mb-0">{{ "{:,.2f}".format(total_goods) }} ج.م</h3>
+                            {% if partial_goods is defined and partial_goods > 0 %}
+                            <small class="text-muted d-block mt-1" style="font-size: 0.78rem;">منها <strong class="text-dark">{{ "{:,.2f}".format(partial_goods) }} ج.م</strong> مرتجع جزئي بالمخزن</small>
+                            {% endif %}
                         </div>
                         <i class="fa-solid fa-boxes-stacked fa-3x text-warning opacity-25"></i>
                     </div>
@@ -460,10 +463,16 @@
                                             <span class="badge bg-primary">مخزن</span>
                                         {% elif order.status == 'مع المندوب' or order.status == 'قيد التوصيل' %}
                                             <span class="badge bg-warning text-dark px-2 py-1"><i class="fa-solid fa-motorcycle me-1"></i> {{ order.courier.name if order.courier else 'مع المندوب' }}</span>
+                                        {% elif order.status == 'تم التوصيل' %}
+                                            <span class="badge bg-success"><i class="fa-solid fa-check-double me-1"></i> تم التوصيل</span>
+                                        {% elif order.status == 'تسليم جزئي / مرتجع' %}
+                                            <span class="badge bg-warning text-dark border border-dark"><i class="fa-solid fa-box-tissue me-1"></i> تسليم جزئي / مرتجع</span>
                                         {% elif order.status == 'مؤجل' %}
                                             <span class="badge bg-secondary">مؤجل</span>
                                         {% elif order.status == 'مرتجع' %}
                                             <span class="badge bg-danger">مرتجع</span>
+                                        {% elif order.status == 'مرتجع بشحن' %}
+                                            <span class="badge bg-info text-dark">مرتجع بشحن</span>
                                         {% elif order.status == 'مرتجع شركة' %}
                                             <span class="badge bg-dark">مرتجع شركة</span>
                                         {% else %}
@@ -575,7 +584,7 @@
                                 <div class="col-md-6 mb-3">
                                     <label class="form-label fw-bold">الحالة</label>
                                     <select name="status" id="edit_status" class="form-select border-primary" onchange="togglePartialDeliverySingle(this)">
-                                        {% for status in statuses %}
+                                        {% for status in (all_statuses if all_statuses is defined else statuses) %}
                                         <option value="{{ status }}">{{ status }}</option>
                                         {% endfor %}
                                     </select>
