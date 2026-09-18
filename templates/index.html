@@ -724,12 +724,12 @@
         });
 
         const sections = {
-            client: ['العميل', 'اسم العميل', 'الاسم', 'اسم'],
-            phone: ['الهاتف', 'الموبايل', 'التليفون', 'تليفون', 'موبايل', 'فون', 'رقم الهاتف', 'رقم التليفون', 'رقم التواصل', 'الرقم', 'رقم', 'ت'],
-            address: ['العنوان', 'عنوان العميل', 'عنوان', 'مكان التوصيل', 'المكان', 'لوكيشن', 'location', 'address'],
+            client: ['العميل', 'اسم العميل', 'الاسم'],
+            phone: ['الهاتف', 'الموبايل', 'التليفون', 'تليفون', 'موبايل', 'فون', 'رقم الهاتف', 'رقم التليفون', 'رقم التواصل', 'الرقم'],
+            address: ['العنوان', 'عنوان العميل', 'مكان التوصيل', 'لوكيشن', 'location', 'address'],
             region: ['المنطقة', 'منطقة', 'المحافظة', 'محافظة', 'المدينة', 'مدينة'],
-            content: ['المنتج', 'المنتجات', 'المحتوى', 'تفاصيل', 'تفاصيل الاوردر', 'تفاصيل الأوردر', 'الاوردر', 'الأوردر', 'اوردر', 'أوردر', 'الطلب', 'الصنف', 'الاصناف', 'الأصناف', 'محتويات'],
-            cod: ['السعر', 'المبلغ', 'الحساب', 'المطلوب', 'المطلوب تحصيله', 'التحصيل', 'مبلغ التحصيل', 'اجمالي', 'إجمالي', 'الاجمالي', 'الإجمالي', 'صافي', 'الصافي', 'cod', 'price', 'total'],
+            content: ['المنتج', 'المنتجات', 'المحتوى', 'تفاصيل الاوردر', 'تفاصيل الأوردر', 'تفاصيل', 'الاوردر', 'الأوردر', 'اوردر', 'أوردر', 'الطلب', 'الصنف', 'الاصناف', 'الأصناف', 'محتويات'],
+            cod: ['السعر', 'المبلغ', 'الحساب', 'المطلوب تحصيله', 'المطلوب', 'التحصيل', 'مبلغ التحصيل', 'اجمالي', 'إجمالي', 'الاجمالي', 'الإجمالي', 'صافي', 'الصافي', 'cod', 'price', 'total'],
             shipping: ['الشحن', 'مصاريف الشحن', 'سعر الشحن', 'توصيل', 'shipping'],
             company: ['الشركة', 'اسم الشركة', 'شركة', 'بيدج', 'صفحة', 'page', 'company']
         };
@@ -741,8 +741,9 @@
         }
         allKeywords.sort((a, b) => b.length - a.length);
 
-        // If text contains inline labels separated by ' - ' or ' | ' or commas, break them onto new lines
-        const kwRegex = new RegExp('[\\s|,\\-]+(?=(?:' + allKeywords.map(k => k.replace(/[-\\/\\^$*+?.()|[\\]{}]/g, '\\$&')).join('|') + ')[\\s:\\-=])', 'gi');
+        // Only split on explicit delimiters (dash, pipe, comma, or newline) preceding a keyword with a colon
+        const kwPattern = allKeywords.map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|');
+        const kwRegex = new RegExp('(?:[\\r\\n|,]+|\\s+[-|/]\\s+)(?=(?:' + kwPattern + ')[\\s:\\-=])', 'gi');
         text = text.replace(kwRegex, '\n');
 
         const lines = text.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
@@ -765,11 +766,11 @@
             let matchedVal = '';
 
             for (const sec in sections) {
-                const pattern = new RegExp('^(?:' + sections[sec].map(k => k.replace(/[-\\/\\^$*+?.()|[\\]{}]/g, '\\$&')).join('|') + ')[\\s:\\-=]*(.*)$', 'i');
+                const pattern = new RegExp('^(?:' + sections[sec].map(k => k.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&')).join('|') + ')(?:[\\s:\\-=]+(.*)|$)', 'i');
                 const m = line.match(pattern);
                 if (m) {
                     matchedSection = sec;
-                    matchedVal = m[1].trim();
+                    matchedVal = (m[1] || '').trim();
                     break;
                 }
             }
