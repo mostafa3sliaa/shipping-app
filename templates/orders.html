@@ -75,7 +75,17 @@
                                 <small class="text-muted"><i class="fa-solid fa-phone fa-sm"></i> {{ order.phone }}</small>
                             </td>
                             <td>{{ order.region }}</td>
-                            <td class="fw-bold text-success">{{ "{:,.2f}".format(order.cod) }}</td>
+                            <td class="fw-bold text-success">
+                                <div>{{ "{:,.2f}".format(order.cod) }}</div>
+                                {% if order.collected_amount is not none and (order.status == 'تسليم جزئي / مرتجع' or (order.status == 'مرتجع شركة' and order.collected_amount > 0)) and order.collected_amount < order.cod %}
+                                <div class="mt-1">
+                                    <span class="badge bg-warning text-dark border border-secondary" style="font-size: 0.75rem; font-weight: bold;" title="صافي قيمة البضاعة المسلمة للشركة بعد خصم المرتجع والشحن">
+                                        {{ "{:,.2f}".format(order.collected_amount - (order.shipping_fee or 0.0)) }} ج.م
+                                    </span>
+                                    <small class="text-muted d-block" style="font-size: 0.68rem;">(للشركة)</small>
+                                </div>
+                                {% endif %}
+                            </td>
                             <td class="text-muted">{{ order.shipping_fee }}</td>
                             <td>
                                 {% if order.status == 'جديد بالمخزن' %}

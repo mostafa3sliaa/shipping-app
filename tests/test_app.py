@@ -350,4 +350,62 @@ def test_reset_profit_without_deducting_treasury(client):
         assert reset_tx.amount == 100.0
         assert reset_tx.method == 'أرباح'
 
+def test_partial_delivery_display_and_reversal(client):
+    with app.app_context():
+        comp = Company(name="Co Partial")
+        db.session.add(comp)
+        db.session.commit()
+
+        # Order with COD 370, shipping 70.
+        # Delivered 270 (shipping 70 + goods 200), courier took 50.
+        o = Order(
+            tracking_number='TRK-PARTIAL-1',
+            client_name='Customer 1',
+            phone='0109999999',
+            address='Cairo',
+            company_id=comp.id,
+            cod=370.0,
+            shipping_fee=70.0,
+            courier_fee=50.0,
+            collected_amount=270.0,
+            status='تسليم جزئي / مرتجع',
+            courier_settled=True
+        )
+        # Net collected into treasury = 270 - 50 = 220
+        tx = TreasuryTransaction(amount=220.0, method='كاش', tx_type='تحصيل_من_مندوب', notes='تحصيل جزئي')
+        db.session.add_all([o, tx])
+        db.session.commit()
+
+    # 1. Test template display: Should show original COD 370.00 and Company Net 200.00
+    res = client.get('/')
+    assert res.status_code == 200
+    assert b'370.00' in res.data
+    assert b'200.00' in res.data
+
+    # 2. Test status change away from delivered/partial -> e.g. to 'مع المندوب'
+    with app.app_context():
+        order_id = Order.query.filter_by(tracking_number='TRK-PARTIAL-1').first().id
+
+    edit_res = client.post(f'/order/{order_id}/edit', data={
+        'tracking_number': 'TRK-PARTIAL-1',
+        'client_name': 'Customer 1',
+        'phone': '0109999999',
+        'address': 'Cairo',
+        'cod': '370',
+        'shipping_fee': '70',
+        'status': 'مع المندوب'
+    }, follow_redirects=True)
+    assert edit_res.status_code == 200
+
+    # Verify treasury reversed the 220, so total cash in treasury becomes 0
+    with app.app_context():
+        cash = db.session.query(db.func.sum(TreasuryTransaction.amount)).filter_by(method='كاش').scalar()
+        assert cash == 0.0
+
+        updated_order = db.session.get(Order, order_id)
+        assert updated_order.status == 'مع المندوب'
+        assert updated_order.courier_settled == False
+        assert updated_order.collected_amount is None
+
+
 
