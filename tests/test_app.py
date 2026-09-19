@@ -407,5 +407,55 @@ def test_partial_delivery_display_and_reversal(client):
         assert updated_order.courier_settled == False
         assert updated_order.collected_amount is None
 
+def test_api_scan_and_database_search(client):
+    with app.app_context():
+        comp = Company(name="Company Scan")
+        db.session.add(comp)
+        db.session.commit()
+
+        o = Order(
+            tracking_number='SHP-A7D8A6',
+            client_name='Rabab Sobhy',
+            phone='01111108660',
+            address='10 Street Nasr City',
+            content='2 Dress L',
+            company_id=comp.id,
+            cod=370.0,
+            shipping_fee=70.0,
+            status='مخزن'
+        )
+        db.session.add(o)
+        db.session.commit()
+
+    # 1. Test /api/scan with phone number returns full details
+    resp = client.get('/api/scan?q=01111108660')
+    assert resp.status_code == 200
+    data = resp.get_json()
+    assert len(data['orders']) == 1
+    order_data = data['orders'][0]
+    assert order_data['tracking_number'] == 'SHP-A7D8A6'
+    assert order_data['client_name'] == 'Rabab Sobhy'
+    assert order_data['address'] == '10 Street Nasr City'
+    assert order_data['content'] == '2 Dress L'
+    assert order_data['company_name'] == 'Company Scan'
+    assert order_data['cod'] == 370.0
+    assert order_data['shipping_fee'] == 70.0
+
+    # 2. Test /api/scan with case-insensitive name
+    resp_name = client.get('/api/scan?q=rabab')
+    assert resp_name.status_code == 200
+    assert len(resp_name.get_json()['orders']) == 1
+
+    # 3. Test main database search with phone and case-insensitive tracking
+    search_resp = client.get('/?tab=orders&search=01111108660')
+    assert search_resp.status_code == 200
+    assert b'SHP-A7D8A6' in search_resp.data
+    assert b'Rabab Sobhy' in search_resp.data
+
+    search_trk = client.get('/?tab=orders&search=shp-a7d8a6')
+    assert search_trk.status_code == 200
+    assert b'SHP-A7D8A6' in search_trk.data
+
+
 
 

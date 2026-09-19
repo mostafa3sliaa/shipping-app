@@ -252,11 +252,14 @@ def index():
         duplicate_phones = set()
     
     if search_query:
+        clean_search = search_query.strip()
         query = query.filter(or_(
-            Order.tracking_number.contains(search_query),
-            Order.client_name.contains(search_query),
-            Order.phone.contains(search_query),
-            Order.batch_id == search_query
+            Order.tracking_number.ilike(f'%{clean_search}%'),
+            Order.client_name.ilike(f'%{clean_search}%'),
+            Order.phone.ilike(f'%{clean_search}%'),
+            Order.address.ilike(f'%{clean_search}%'),
+            Order.content.ilike(f'%{clean_search}%'),
+            Order.batch_id == clean_search
         ))
         
     if filter_company:
@@ -421,11 +424,14 @@ def export_excel():
     query = Order.query.options(joinedload(Order.company), joinedload(Order.courier))
     
     if search_query:
+        clean_search = search_query.strip()
         query = query.filter(or_(
-            Order.tracking_number.contains(search_query),
-            Order.client_name.contains(search_query),
-            Order.phone.contains(search_query),
-            Order.batch_id == search_query
+            Order.tracking_number.ilike(f'%{clean_search}%'),
+            Order.client_name.ilike(f'%{clean_search}%'),
+            Order.phone.ilike(f'%{clean_search}%'),
+            Order.address.ilike(f'%{clean_search}%'),
+            Order.content.ilike(f'%{clean_search}%'),
+            Order.batch_id == clean_search
         ))
     if filter_company:
         if filter_company == 'none':
@@ -772,9 +778,10 @@ def api_scan():
     if not query:
         return {'error': 'No query provided'}, 400
         
-    orders = Order.query.filter(or_(
-        Order.tracking_number == query,
-        Order.phone.contains(query)
+    orders = Order.query.options(joinedload(Order.company), joinedload(Order.courier)).filter(or_(
+        Order.tracking_number.ilike(f'%{query}%'),
+        Order.phone.ilike(f'%{query}%'),
+        Order.client_name.ilike(f'%{query}%')
     )).all()
     
     if not orders:
@@ -785,11 +792,19 @@ def api_scan():
         result.append({
             'id': o.id,
             'tracking_number': o.tracking_number,
-            'client_name': o.client_name,
-            'phone': o.phone,
-            'region': o.region,
-            'cod': o.cod,
-            'status': o.status
+            'created_at': o.created_at.strftime('%Y-%m-%d') if o.created_at else '',
+            'company_name': o.company.name if o.company else '',
+            'client_name': o.client_name or '',
+            'phone': o.phone or '',
+            'address': o.address or '',
+            'region': o.region or '',
+            'content': o.content or '',
+            'cod': o.cod or 0.0,
+            'shipping_fee': o.shipping_fee or 0.0,
+            'collected_amount': o.collected_amount,
+            'status': o.status or 'مخزن',
+            'courier_name': o.courier.name if o.courier else '',
+            'is_copied': bool(o.is_copied)
         })
     return {'orders': result}
 

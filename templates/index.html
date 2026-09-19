@@ -328,8 +328,11 @@
                     
                     <div class="col-md-2">
                         <div class="input-group">
-                            <span class="input-group-text bg-primary text-white"><i class="fa-solid fa-search"></i></span>
-                            <input type="text" id="liveSearchInput" name="search" class="form-control border-primary" placeholder="بحث بالبوليصة، الاسم..." value="{{ search_query }}" oninput="liveSearch()">
+                            <button type="submit" class="btn btn-primary" title="بحث في قاعدة البيانات"><i class="fa-solid fa-search"></i></button>
+                            <input type="text" id="liveSearchInput" name="search" class="form-control border-primary" placeholder="بحث بالبوليصة، الهاتف، الاسم..." value="{{ search_query }}" oninput="liveSearch()">
+                            {% if search_query %}
+                            <a href="{{ url_for('index', tab='orders') }}" class="btn btn-outline-danger" title="إلغاء البحث"><i class="fa-solid fa-times"></i></a>
+                            {% endif %}
                         </div>
                     </div>
                     
@@ -954,6 +957,107 @@
         }
     })();
 
+    function renderFullOrderRow(order) {
+        const tr = document.createElement('tr');
+        tr.id = `order-row-${order.id}`;
+        tr.className = order.is_copied ? 'bg-success bg-opacity-25' : 'bg-white';
+
+        // Status Badge
+        let statusBadge = '';
+        const st = order.status || 'مخزن';
+        if (st === 'مخزن' || st === 'جديد بالمخزن') {
+            statusBadge = '<span class="badge bg-primary">مخزن</span>';
+        } else if (st === 'مع المندوب' || st === 'قيد التوصيل') {
+            statusBadge = `<span class="badge bg-warning text-dark px-2 py-1"><i class="fa-solid fa-motorcycle me-1"></i> ${order.courier_name || 'مع المندوب'}</span>`;
+        } else if (st === 'تم التوصيل') {
+            statusBadge = '<span class="badge bg-success"><i class="fa-solid fa-check-double me-1"></i> تم التوصيل</span>';
+        } else if (st === 'تسليم جزئي / مرتجع') {
+            statusBadge = '<span class="badge bg-warning text-dark border border-dark"><i class="fa-solid fa-box-tissue me-1"></i> تسليم جزئي / مرتجع</span>';
+        } else if (st === 'مؤجل') {
+            statusBadge = '<span class="badge bg-secondary">مؤجل</span>';
+        } else if (st === 'مرتجع') {
+            statusBadge = '<span class="badge bg-danger">مرتجع</span>';
+        } else if (st === 'مرتجع بشحن') {
+            statusBadge = '<span class="badge bg-info text-dark">مرتجع بشحن</span>';
+        } else if (st === 'مرتجع شركة') {
+            statusBadge = '<span class="badge bg-dark">مرتجع شركة</span>';
+        } else {
+            statusBadge = `<span class="badge bg-dark">${st}</span>`;
+        }
+
+        // COD & Partial badge
+        const codVal = Number(order.cod || 0);
+        let codHtml = `<div>${codVal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>`;
+        if (order.collected_amount != null && (st === 'تسليم جزئي / مرتجع' || (st === 'مرتجع شركة' && order.collected_amount > 0)) && order.collected_amount < codVal) {
+            const netCompany = Number(order.collected_amount - (order.shipping_fee || 0)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            codHtml += `
+                <div class="mt-1">
+                    <span class="badge bg-warning text-dark border border-secondary" style="font-size: 0.75rem; font-weight: bold;" title="صافي قيمة البضاعة المسلمة للشركة بعد خصم المرتجع والشحن">
+                        ${netCompany} ج.م
+                    </span>
+                    <small class="text-muted d-block" style="font-size: 0.68rem;">(للشركة)</small>
+                </div>
+            `;
+        }
+
+        // Company & Region
+        let companyRegionHtml = `<span class="badge bg-info text-dark d-block mb-1">${order.company_name || '-'}</span>`;
+        if (order.region && order.region !== 'غير محدد') {
+            companyRegionHtml += `<span class="badge d-block text-dark border border-secondary" style="background-color: #f0f0f0;"><i class="fa-solid fa-map-pin me-1 opacity-75"></i> ${order.region}</span>`;
+        }
+
+        // Actions
+        const safeContent = (order.content || '').replace(/"/g, '&quot;');
+        const safeAddress = (order.address || '').replace(/"/g, '&quot;');
+        const safeClient = (order.client_name || '').replace(/"/g, '&quot;');
+        const safeCompany = (order.company_name || '').replace(/"/g, '&quot;');
+        
+        const actionsHtml = `
+            <button type="button" class="btn btn-sm ${order.is_copied ? 'btn-dark' : 'btn-success'} rounded-circle mb-1" title="نسخ للمندوب" onclick="copyOrderDetails(${order.id}, this)"
+                    data-client="${safeClient}" 
+                    data-phone="${order.phone || ''}"
+                    data-address="${safeAddress}"
+                    data-content="${safeContent}"
+                    data-price="${codVal}"
+                    data-company="${safeCompany}">
+                ${order.is_copied ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-brands fa-whatsapp"></i>'}
+            </button>
+            <button type="button" class="btn btn-sm btn-primary rounded-circle mb-1 ms-1" title="تعديل" onclick="openEditModal(${order.id})">
+                <i class="fa-solid fa-pen"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-danger rounded-circle mb-1 ms-1" title="مسح" onclick="deleteSingleOrder(${order.id})">
+                <i class="fa-solid fa-trash"></i>
+            </button>
+        `;
+
+        tr.innerHTML = `
+            <td class="px-3">
+                <input class="form-check-input order-checkbox" type="checkbox" name="order_ids" value="${order.id}" id="checkbox-${order.id}">
+            </td>
+            <td class="px-2 fw-bold text-primary">${order.tracking_number}</td>
+            <td>
+                <small class="text-muted">${order.created_at || '-'}</small>
+                <span class="badge bg-warning text-dark d-block mt-1" style="font-size: 0.65rem;"><i class="fa-solid fa-bolt"></i> باركود</span>
+            </td>
+            <td>${companyRegionHtml}</td>
+            <td>
+                <div class="fw-bold">${order.client_name || '-'}</div>
+                <small class="text-muted"><i class="fa-solid fa-phone fa-sm"></i> ${order.phone || '-'}</small>
+            </td>
+            <td>
+                <div class="text-wrap" style="max-width: 250px; font-size: 0.9rem;">${order.address || '-'}</div>
+            </td>
+            <td>
+                <div class="text-wrap text-muted" style="max-width: 150px; font-size: 0.8rem;">${order.content || '-'}</div>
+            </td>
+            <td class="fw-bold text-success">${codHtml}</td>
+            <td class="text-muted">${order.shipping_fee != null ? order.shipping_fee : '-'}</td>
+            <td>${statusBadge}</td>
+            <td class="text-center" style="min-width: 120px;">${actionsHtml}</td>
+        `;
+        return tr;
+    }
+
     // Inline Scanner Logic in Orders Tab
     async function handleInlineScan(event) {
         event.preventDefault();
@@ -983,33 +1087,13 @@
                 let tr = document.getElementById(`order-row-${order.id}`);
                 let checkbox = document.getElementById(`checkbox-${order.id}`);
                 
-                // If row doesn't exist on current page, create a temporary one so it can be bulk processed
+                // If row doesn't exist on current page, create a complete full row
                 if (!tr) {
                     // Remove "No orders" message if present
-                    const noOrdersRow = tbody.querySelector('td[colspan="9"]');
+                    const noOrdersRow = tbody.querySelector('td[colspan]');
                     if (noOrdersRow) noOrdersRow.parentElement.remove();
                     
-                    tr = document.createElement('tr');
-                    tr.id = `order-row-${order.id}`;
-                    tr.className = 'bg-white';
-                    tr.innerHTML = `
-                        <td class="px-3">
-                            <input class="form-check-input order-checkbox" type="checkbox" name="order_ids" value="${order.id}" id="checkbox-${order.id}">
-                        </td>
-                        <td class="px-2 fw-bold text-primary">${order.tracking_number}</td>
-                        <td><small class="text-warning fw-bold"><i class="fa-solid fa-bolt"></i> باركود</small></td>
-                        <td>-</td>
-                        <td>
-                            <div class="fw-bold">${order.client_name || ''}</div>
-                            <small class="text-muted"><i class="fa-solid fa-phone fa-sm"></i> ${order.phone || ''}</small>
-                        </td>
-                        <td><div class="text-wrap" style="max-width: 250px; font-size: 0.9rem;">${order.region || ''}</div></td>
-                        <td>-</td>
-                        <td class="fw-bold text-success">${order.cod || 0}</td>
-                        <td>-</td>
-                        <td><span class="badge bg-dark">${order.status || ''}</span></td>
-                        <td class="text-center">-</td>
-                    `;
+                    tr = renderFullOrderRow(order);
                     checkbox = tr.querySelector('.order-checkbox');
                 }
                 
@@ -1051,17 +1135,42 @@
     
     // === Live Search ===
     function liveSearch() {
-        const input = document.getElementById('liveSearchInput').value.toLowerCase();
+        const input = document.getElementById('liveSearchInput').value.trim().toLowerCase();
         const rows = document.querySelectorAll('tbody tr[id^="order-row-"]');
+        let visibleCount = 0;
         
         rows.forEach(row => {
             const text = row.innerText.toLowerCase();
             if (text.includes(input)) {
                 row.style.display = '';
+                visibleCount++;
             } else {
                 row.style.display = 'none';
             }
         });
+        
+        let promptRow = document.getElementById('liveSearchPromptRow');
+        if (input.length > 0 && visibleCount === 0) {
+            const tbody = document.querySelector('#bulkForm table tbody');
+            if (!promptRow && tbody) {
+                promptRow = document.createElement('tr');
+                promptRow.id = 'liveSearchPromptRow';
+                tbody.appendChild(promptRow);
+            }
+            if (promptRow) {
+                promptRow.innerHTML = `
+                    <td colspan="11" class="text-center py-4 bg-light">
+                        <div class="text-muted fw-bold mb-2"><i class="fa-solid fa-circle-info text-primary me-1"></i> الأوردر غير معروض في أول 30 أوردر بالصفحة الحالية.</div>
+                        <button type="button" class="btn btn-primary fw-bold px-3 shadow-sm" onclick="document.getElementById('liveSearchInput').form.submit();">
+                            <i class="fa-solid fa-database me-1"></i> اضغط هنا للبحث في كامل قاعدة البيانات (أو اضغط Enter)
+                        </button>
+                    </td>
+                `;
+                promptRow.style.display = '';
+            }
+        } else if (promptRow) {
+            promptRow.style.display = 'none';
+        }
     }
 
     // === Deposit History Filter ===
