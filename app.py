@@ -1218,8 +1218,20 @@ def edit_order(order_id):
             order.courier_id = None
             
     elif new_status in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع']:
-        if new_net > 0:
-            if not old_settled:
+        if old_settled:
+            # Already settled before, adjust if amounts changed
+            diff = new_net - old_net
+            if diff != 0:
+                tx = TreasuryTransaction(
+                    amount=diff,
+                    method='كاش',
+                    tx_type='تعديل_تحصيل',
+                    entity_id=order.courier_id,
+                    notes=f'تعديل تحصيل للأوردر {order.tracking_number} (فارق {diff:+.2f} ج.م)'
+                )
+                db.session.add(tx)
+        else:
+            if new_net > 0:
                 # First-time settlement via edit modal
                 tx = TreasuryTransaction(
                     amount=new_net,
@@ -1230,24 +1242,8 @@ def edit_order(order_id):
                 )
                 db.session.add(tx)
                 order.courier_settled = True
-            elif old_settled:
-                # Already settled before, adjust if amounts changed
-                diff = new_net - old_net
-                if diff != 0:
-                    tx = TreasuryTransaction(
-                        amount=diff,
-                        method='كاش',
-                        tx_type='تعديل_تحصيل',
-                        entity_id=order.courier_id,
-                        notes=f'تعديل تحصيل للأوردر {order.tracking_number} (فارق {diff:+.2f} ج.م)'
-                    )
-                    db.session.add(tx)
-        else:
-            # new_net is 0 (regular return without fees)
-            if old_status != new_status and old_settled and old_net > 0:
-                reverse_order_treasury_collection(order, reason=f'تحويل إلى {new_status} بدون تحصيل', amount=old_net)
-            elif not old_settled:
-                order.collected_amount = 0.0
+            elif new_status == 'مرتجع':
+                order.courier_settled = True
 
     elif new_status == 'مرتجع شركة':
         if old_settled and old_net > 0 and old_status == 'تم التوصيل':
@@ -1256,6 +1252,106 @@ def edit_order(order_id):
     db.session.commit()
     flash('تم تعديل الأوردر بنجاح', 'success')
     return redirect(url_for('index', tab='orders'))
+
+@app.route('/order/<int:order_id>/settlement_edit', methods=['POST'])
+@login_required
+def order_settlement_edit(order_id):
+    order = Order.query.get_or_404(order_id)
+    old_status = order.status
+    old_settled = order.courier_settled
+    old_collected = order.collected_amount or 0.0
+    old_fee = order.courier_fee or 0.0
+    old_net = old_collected - old_fee
+    
+    status_choice = request.form.get('status_choice', order.status).strip()
+    
+    try:
+        shipping_fee = float(request.form.get('shipping_fee', order.shipping_fee or 70.0))
+        order.shipping_fee = shipping_fee
+    except:
+        pass
+        
+    courier_name = request.form.get('courier_name', '').strip()
+    if courier_name:
+        c = Courier.query.filter_by(name=courier_name).first()
+        if not c:
+            c = Courier(name=courier_name)
+            db.session.add(c)
+            db.session.flush()
+        order.courier_id = c.id
+
+    if status_choice == 'مخزن':
+        # Revert completely to warehouse:
+        if old_settled and old_net > 0:
+            reverse_order_treasury_collection(order, reason='إعادة للمخزن من تفاصيل الأرباح', amount=old_net)
+        else:
+            order.courier_settled = False
+            order.company_settled = False
+            order.collected_amount = None
+            order.courier_fee = None
+        order.status = 'مخزن'
+        flash(f'تمت إعادة الأوردر {order.tracking_number} إلى المخزن وإلغاء تسليمه.', 'success')
+    else:
+        if status_choice == 'مرتجع_بدون_شحن':
+            order.status = 'مرتجع'
+            order.collected_amount = 0.0
+            try:
+                order.courier_fee = float(request.form.get('courier_fee', 0.0) or 0.0)
+            except:
+                order.courier_fee = 0.0
+        elif status_choice == 'مرتجع_بشحن':
+            order.status = 'مرتجع'
+            try:
+                col = float(request.form.get('collected_amount', order.shipping_fee or 0.0) or 0.0)
+            except:
+                col = order.shipping_fee or 0.0
+            order.collected_amount = col if col > 0 else (order.shipping_fee or 70.0)
+            try:
+                order.courier_fee = float(request.form.get('courier_fee', 0.0) or 0.0)
+            except:
+                order.courier_fee = 0.0
+        else:
+            order.status = status_choice
+            try:
+                order.collected_amount = float(request.form.get('collected_amount', 0.0) or 0.0)
+            except:
+                order.collected_amount = order.cod if status_choice == 'تم التوصيل' else 0.0
+            try:
+                order.courier_fee = float(request.form.get('courier_fee', 0.0) or 0.0)
+            except:
+                order.courier_fee = 0.0
+
+        order.courier_settled = True
+        new_collected = order.collected_amount or 0.0
+        new_fee = order.courier_fee or 0.0
+        new_net = new_collected - new_fee
+        
+        # Adjust treasury
+        if old_settled:
+            diff = new_net - old_net
+            if diff != 0:
+                tx = TreasuryTransaction(
+                    amount=diff,
+                    method='كاش',
+                    tx_type='تعديل_تحصيل',
+                    entity_id=order.courier_id,
+                    notes=f'تعديل تسليم للأوردر {order.tracking_number} (فارق {diff:+.2f} ج.م)'
+                )
+                db.session.add(tx)
+        else:
+            if new_net > 0:
+                tx = TreasuryTransaction(
+                    amount=new_net,
+                    method='كاش',
+                    tx_type='تحصيل_من_مندوب',
+                    entity_id=order.courier_id,
+                    notes=f'تحصيل نقدي للأوردر {order.tracking_number} ({order.status})'
+                )
+                db.session.add(tx)
+        flash(f'تم تعديل تسليم الأوردر {order.tracking_number} وتحديث الأرباح بنجاح!', 'success')
+
+    db.session.commit()
+    return redirect(url_for('index', tab='dashboard'))
 
 @app.route('/api/reset_db', methods=['POST'])
 def reset_db():

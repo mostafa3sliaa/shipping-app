@@ -823,6 +823,64 @@ def test_strictly_settled_company_profit(client):
     assert 'TRK-SETTLED-1' in modal_part
     assert 'TRK-UNSETTLED-1' not in modal_part
 
+def test_order_settlement_edit_from_profit_modal(client):
+    """
+    Test editing an order's settlement via /order/<id>/settlement_edit:
+    1. An order with return with shipping (70 collected, 0 fee -> profit = 70)
+    2. Edited to 'مرتجع_بدون_شحن' (0 collected)
+    3. Verify collected_amount becomes 0, profit drops from 70 to 0, and treasury is adjusted.
+    """
+    with app.app_context():
+        comp = Company(name="Co Return")
+        db.session.add(comp)
+        db.session.commit()
+
+        # Settled return with shipping 70
+        order = Order(
+            tracking_number='SHP-TEST-RETURN-70',
+            company_id=comp.id,
+            status='مرتجع',
+            cod=370.0,
+            shipping_fee=70.0,
+            collected_amount=70.0,
+            courier_fee=0.0,
+            courier_settled=True
+        )
+        # Old treasury transaction
+        tx = TreasuryTransaction(amount=70.0, method='كاش', tx_type='تحصيل_من_مندوب', notes='تحصيل')
+        db.session.add_all([order, tx])
+        db.session.commit()
+        order_id = order.id
+
+    # Check that initially company_profit is 70.00
+    r1 = client.get('/')
+    assert '70.00 ج.م' in r1.get_data(as_text=True)
+
+    # Now edit settlement to 'مرتجع_بدون_شحن' with collected_amount=0
+    post_res = client.post(f'/order/{order_id}/settlement_edit', data={
+        'status_choice': 'مرتجع_بدون_شحن',
+        'collected_amount': '0',
+        'courier_fee': '0',
+        'shipping_fee': '70'
+    }, follow_redirects=True)
+    assert post_res.status_code == 200
+
+    # Verify order and treasury in DB
+    with app.app_context():
+        o = db.session.get(Order, order_id)
+        assert o.status == 'مرتجع'
+        assert o.collected_amount == 0.0
+        assert o.courier_settled == True
+
+        # Check treasury transactions: should have adjustment of -70
+        adj_tx = TreasuryTransaction.query.filter_by(tx_type='تعديل_تحصيل').first()
+        assert adj_tx is not None
+        assert adj_tx.amount == -70.0
+
+    # Check homepage: profit should now be 0.00 ج.م!
+    r2 = client.get('/')
+    assert '0.00 ج.م' in r2.get_data(as_text=True)
+
 
 
 

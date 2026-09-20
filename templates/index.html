@@ -1369,11 +1369,123 @@
 
     function togglePartialDeliverySingle(selectElement) {
         const fields = document.getElementById('single-accounting-fields');
-        if (selectElement.value === 'تسليم جزئي / مرتجع' || selectElement.value === 'تم التوصيل') {
+        if (selectElement.value === 'تسليم جزئي / مرتجع' || selectElement.value === 'تم التوصيل' || selectElement.value === 'مرتجع') {
             fields.style.display = 'flex';
         } else {
             fields.style.display = 'none';
         }
+    }
+
+    // Settlement Edit from Profit Modal
+    let currentSettleCod = 0;
+
+    function openSettlementEditModal(orderId, trackingNumber, status, shippingFee, courierFee, collectedAmount, cod, courierName) {
+        currentSettleCod = cod || 0;
+        document.getElementById('settleModalTracking').innerText = trackingNumber;
+        document.getElementById('settlementEditForm').action = '/order/' + orderId + '/settlement_edit';
+        
+        document.getElementById('settle_shipping_fee').value = shippingFee || 0;
+        document.getElementById('settle_courier_fee').value = courierFee || 0;
+        document.getElementById('settle_collected_amount').value = (collectedAmount !== null && collectedAmount !== undefined) ? collectedAmount : 0;
+        document.getElementById('settle_courier_name').value = courierName || '';
+        
+        const select = document.getElementById('settle_status_choice');
+        if (status === 'مرتجع') {
+            if (collectedAmount > 0) {
+                select.value = 'مرتجع_بشحن';
+            } else {
+                select.value = 'مرتجع_بدون_شحن';
+            }
+        } else if (status === 'تسليم جزئي / مرتجع') {
+            select.value = 'تسليم جزئي / مرتجع';
+        } else if (status === 'تم التوصيل') {
+            select.value = 'تم التوصيل';
+        } else if (status === 'مخزن') {
+            select.value = 'مخزن';
+        } else {
+            select.value = status;
+        }
+        
+        handleSettleStatusChange(select);
+        calculateSettlePreview();
+        
+        // Hide profit modal first if open
+        const profitModalEl = document.getElementById('profitBreakdownModal');
+        if (profitModalEl) {
+            const modalInstance = bootstrap.Modal.getInstance(profitModalEl);
+            if (modalInstance) modalInstance.hide();
+        }
+        
+        const settleModal = new bootstrap.Modal(document.getElementById('editSettlementModal'));
+        settleModal.show();
+    }
+
+    function handleSettleStatusChange(select) {
+        const val = select.value;
+        const colInput = document.getElementById('settle_collected_amount');
+        const shipInput = document.getElementById('settle_shipping_fee');
+        const colLabel = document.getElementById('settle_col_amt_label');
+        const colHint = document.getElementById('settle_col_amt_hint');
+        
+        if (val === 'مرتجع_بدون_شحن') {
+            colInput.value = 0;
+            colInput.readOnly = true;
+            colLabel.innerText = 'المبلغ المحصل (صفر)';
+            colHint.innerText = 'مرتجع بدون مصاريف شحن';
+        } else if (val === 'مرتجع_بشحن') {
+            colInput.readOnly = false;
+            if (parseFloat(colInput.value) <= 0) {
+                colInput.value = shipInput.value || 70;
+            }
+            colLabel.innerText = 'مصاريف الشحن المحصلة';
+            colHint.innerText = 'قيمة الشحن المحصلة من العميل';
+        } else if (val === 'تم التوصيل') {
+            colInput.readOnly = false;
+            if (parseFloat(colInput.value) <= 0 && currentSettleCod > 0) {
+                colInput.value = currentSettleCod;
+            }
+            colLabel.innerText = 'إجمالي المبلغ المحصل (COD)';
+            colHint.innerText = 'ثمن الأوردر والشحن';
+        } else if (val === 'تسليم جزئي / مرتجع') {
+            colInput.readOnly = false;
+            colLabel.innerText = 'المبلغ المحصل فعلياً';
+            colHint.innerText = 'ثمن القطع المستلمة + الشحن';
+        } else if (val === 'مخزن') {
+            colInput.value = 0;
+            colInput.readOnly = true;
+            colLabel.innerText = 'المبلغ المحصل (ملغي)';
+            colHint.innerText = 'سيتم إلغاء التحصيل وإعادة الأوردر للمخزن';
+        }
+        calculateSettlePreview();
+    }
+
+    function calculateSettlePreview() {
+        const val = document.getElementById('settle_status_choice').value;
+        const ship = parseFloat(document.getElementById('settle_shipping_fee').value) || 0;
+        const fee = parseFloat(document.getElementById('settle_courier_fee').value) || 0;
+        const col = parseFloat(document.getElementById('settle_collected_amount').value) || 0;
+        
+        let profit = 0;
+        let netCash = 0;
+        
+        if (val === 'مخزن' || val === 'مرتجع_بدون_شحن') {
+            profit = 0;
+            netCash = 0;
+        } else if (val === 'مرتجع_بشحن') {
+            profit = Math.min(col, ship) - fee;
+            netCash = col - fee;
+        } else if (val === 'تم التوصيل' || val === 'تسليم جزئي / مرتجع') {
+            profit = ship - fee;
+            netCash = col - fee;
+        }
+        
+        const profitEl = document.getElementById('settle_profit_preview');
+        const cashEl = document.getElementById('settle_net_cash_preview');
+        
+        profitEl.innerText = (profit >= 0 ? '+' : '') + profit.toFixed(2) + ' ج.م';
+        profitEl.className = profit >= 0 ? 'fw-bold text-success fs-6' : 'fw-bold text-danger fs-6';
+        
+        cashEl.innerText = netCash.toFixed(2) + ' ج.م';
     }
 
     // === Copy Order Details ===
@@ -1596,6 +1708,7 @@
                                 <th>مصاريف الشحن</th>
                                 <th>حساب المندوب</th>
                                 <th>صافي الربح</th>
+                                <th>إجراءات</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1625,6 +1738,13 @@
                                         +{{ "{:,.2f}".format(item.profit) }} ج.م
                                     </span>
                                 </td>
+                                <td>
+                                    <button type="button" class="btn btn-sm btn-primary fw-bold px-2 py-1 shadow-sm"
+                                        onclick="openSettlementEditModal({{ o.id }}, '{{ o.tracking_number }}', '{{ o.status }}', {{ o.shipping_fee or 0.0 }}, {{ o.courier_fee or 0.0 }}, {{ o.collected_amount or 0.0 }}, {{ o.cod or 0.0 }}, '{{ o.courier.name if o.courier else '' }}')"
+                                        title="تعديل تفاصيل التسليم أو المرتجع أو إلغاء التحصيل">
+                                        <i class="fa-solid fa-pen-to-square me-1"></i> تعديل التسليم
+                                    </button>
+                                </td>
                             </tr>
                             {% endfor %}
                         </tbody>
@@ -1641,6 +1761,75 @@
             <div class="modal-footer bg-light">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Edit Settlement from Profit Details (تعديل التسليم والتحصيل) -->
+<div class="modal fade" id="editSettlementModal" tabindex="-1" aria-labelledby="editSettlementModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow-lg text-end">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold" id="editSettlementModalLabel">
+                    <i class="fa-solid fa-pen-to-square me-2"></i> تعديل تسليم الأوردر (<span id="settleModalTracking"></span>)
+                </h5>
+                <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="settlementEditForm" action="" method="POST">
+                <div class="modal-body p-4 bg-light">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">حالة التسليم</label>
+                        <select name="status_choice" id="settle_status_choice" class="form-select border-primary fw-bold" onchange="handleSettleStatusChange(this)">
+                            <option value="تم التوصيل">تم التوصيل (تسليم كامل)</option>
+                            <option value="تسليم جزئي / مرتجع">تسليم جزئي / مرتجع</option>
+                            <option value="مرتجع_بشحن">مرتجع بمصاريف شحن (تحصيل الشحن)</option>
+                            <option value="مرتجع_بدون_شحن">مرتجع بدون مصاريف شحن (تحصيل شحن = 0)</option>
+                            <option value="مخزن">إعادة للمخزن (إلغاء التقفيل والتحصيل)</option>
+                        </select>
+                    </div>
+
+                    <div class="row g-2 mb-3" id="settle_amounts_container">
+                        <div class="col-md-6" id="settle_col_amt_box">
+                            <label class="form-label fw-bold text-success" id="settle_col_amt_label">المبلغ المحصل فعلياً (ج.م)</label>
+                            <input type="number" step="0.01" name="collected_amount" id="settle_collected_amount" class="form-control fw-bold" oninput="calculateSettlePreview()">
+                            <small class="text-muted d-block" id="settle_col_amt_hint" style="font-size: 0.72rem;">اكتب 0 للمرتجع بدون شحن</small>
+                        </div>
+                        <div class="col-md-6" id="settle_fee_box">
+                            <label class="form-label fw-bold text-primary">أجرة / عمولة المندوب (ج.م)</label>
+                            <input type="number" step="0.01" name="courier_fee" id="settle_courier_fee" class="form-control fw-bold" oninput="calculateSettlePreview()">
+                        </div>
+                    </div>
+
+                    <div class="row g-2 mb-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold text-danger">مصاريف الشحن المسجلة (ج.م)</label>
+                            <input type="number" step="0.01" name="shipping_fee" id="settle_shipping_fee" class="form-control" oninput="calculateSettlePreview()">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">اسم المندوب</label>
+                            <input type="text" name="courier_name" id="settle_courier_name" list="couriers_list" class="form-control" placeholder="اسم المندوب...">
+                        </div>
+                    </div>
+
+                    <!-- Live Profit & Settlement Preview -->
+                    <div class="bg-white p-3 rounded border shadow-sm mt-3">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="small text-muted fw-bold">صافي ربح الشركة المتوقع:</span>
+                            <span class="fw-bold text-success fs-6" id="settle_profit_preview">0.00 ج.م</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="small text-muted fw-bold">صافي التحصيل للخزينة:</span>
+                            <span class="fw-bold text-primary fs-6" id="settle_net_cash_preview">0.00 ج.م</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-white">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إلغاء</button>
+                    <button type="submit" class="btn btn-success fw-bold px-4">
+                        <i class="fa-solid fa-check me-1"></i> حفظ وتحديث الأرباح
+                    </button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
