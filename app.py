@@ -895,6 +895,8 @@ def bulk_action():
     action = request.form.get('action')
     order_ids = request.form.getlist('order_ids')
     courier_name = request.form.get('courier_name', '').strip()
+    region_name = request.form.get('bulk_region_name', '').strip()
+    fee_raw = request.form.get('bulk_shipping_fee', '').strip()
     
     if not order_ids:
         flash('لم يتم تحديد أي أوردر!', 'danger')
@@ -906,9 +908,17 @@ def bulk_action():
         for order in orders_to_update:
             reverse_order_treasury_collection(order, reason='مسح الأوردر')
             db.session.delete(order)
+        db.session.commit()
         flash(f'تم مسح {len(order_ids)} أوردر بنجاح', 'success')
-    elif action == 'assign_courier' and courier_name:
-        # Check if courier exists, otherwise create
+        return redirect(url_for('index', tab='orders'))
+
+    if action == 'print_selected':
+        return render_template('print.html', orders=orders_to_update)
+
+    updated_details = []
+
+    # 1. Assign courier if courier_name is provided
+    if courier_name:
         courier = Courier.query.filter_by(name=courier_name).first()
         if not courier:
             courier = Courier(name=courier_name)
@@ -918,64 +928,65 @@ def bulk_action():
         for order in orders_to_update:
             if order.courier_settled:
                 reverse_order_treasury_collection(order, reason=f'إعادة تسليم للمندوب {courier_name}')
-            order.status = 'مع المندوب'
             order.courier_id = courier.id
-        flash(f'تم تسليم {len(order_ids)} أوردر للمندوب ({courier_name}) بنجاح!', 'success')
-    elif action == 'warehouse':
+            if action not in ['warehouse', 'delivered', 'return', 'return_company']:
+                order.status = 'مع المندوب'
+        updated_details.append(f'المندوب: {courier_name}')
+
+    # 2. Set region if provided
+    if region_name:
+        for order in orders_to_update:
+            order.region = region_name
+        updated_details.append(f'المنطقة: {region_name}')
+
+    # 3. Set shipping fee if provided
+    if fee_raw:
+        try:
+            new_fee = float(fee_raw)
+            for order in orders_to_update:
+                order.shipping_fee = new_fee
+            updated_details.append(f'سعر الشحن: {new_fee} ج.م')
+        except ValueError:
+            flash('سعر الشحن يجب أن يكون رقماً صحيحاً.', 'danger')
+
+    # 4. Handle specific status actions
+    if action == 'warehouse':
         for order in orders_to_update:
             reverse_order_treasury_collection(order, reason='استرجاع للمخزن')
             order.status = 'مخزن'
             order.courier_id = None
-        flash(f'تم إرجاع {len(order_ids)} أوردر للمخزن وتسوية الخزينة بنجاح', 'info')
-    elif action == 'set_region':
-        region_name = request.form.get('bulk_region_name')
-        if not region_name:
-            flash('يجب كتابة اسم المنطقة.', 'danger')
-            return redirect(url_for('index', tab='orders'))
-        for order in orders_to_update:
-            order.region = region_name
-        flash(f'تم تعيين المنطقة ({region_name}) لـ {len(order_ids)} أوردر', 'success')
-    elif action == 'set_shipping_fee':
-        fee_raw = request.form.get('bulk_shipping_fee')
-        if fee_raw is None or fee_raw.strip() == '':
-            flash('يجب كتابة سعر الشحن الجديد.', 'danger')
-            return redirect(url_for('index', tab='orders'))
-        try:
-            new_fee = float(fee_raw.strip())
-        except ValueError:
-            flash('سعر الشحن يجب أن يكون رقماً صحيحاً.', 'danger')
-            return redirect(url_for('index', tab='orders'))
-        for order in orders_to_update:
-            order.shipping_fee = new_fee
-        flash(f'تم تعديل سعر الشحن إلى ({new_fee} ج.م) لـ {len(order_ids)} أوردر بنجاح', 'success')
+        updated_details.append('الحالة: مخزن')
     elif action == 'return_company':
         for order in orders_to_update:
             if order.status == 'تم التوصيل' and order.courier_settled:
                 reverse_order_treasury_collection(order, reason='تحويل لمرتجع شركة')
             order.status = 'مرتجع شركة'
-        flash(f'تم تحويل {len(order_ids)} أوردر إلى مرتجع شركة', 'dark')
+        updated_details.append('الحالة: مرتجع شركة')
     elif action == 'delivered':
         for order in orders_to_update:
             order.status = 'تم التوصيل'
-            # Assuming full delivery collected amount equals cod if it's not set
             if order.collected_amount is None:
                 order.collected_amount = order.cod
-        flash(f'تم تعيين {len(order_ids)} أوردر كـ (تم التوصيل)', 'success')
+        updated_details.append('الحالة: تم التوصيل')
     elif action == 'return':
         for order in orders_to_update:
             if order.courier_settled:
                 reverse_order_treasury_collection(order, reason='تحويل لمرتجع')
             order.status = 'مرتجع'
-        flash(f'تم تحويل {len(order_ids)} أوردر إلى مرتجع', 'danger')
+        updated_details.append('الحالة: مرتجع')
     elif action == 'unmark_copied':
         for order in orders_to_update:
             order.is_copied = False
-        flash(f'تم إلغاء علامة النسخ لـ {len(order_ids)} أوردر', 'info')
-    elif action == 'print_selected':
-        # Don't redirect, just render the print template directly with selected orders
-        return render_template('print.html', orders=orders_to_update)
-        
+        updated_details.append('إلغاء علامة النسخ')
+
     db.session.commit()
+
+    if updated_details:
+        details_str = ' | '.join(updated_details)
+        flash(f'تم تطبيق التعديلات على {len(order_ids)} أوردر بنجاح ({details_str})', 'success')
+    else:
+        flash('لم تقم بتحديد أي تعديل لتطبيقه على الأوردرات المحددة.', 'warning')
+
     return redirect(url_for('index', tab='orders'))
 
 @app.route('/order/<int:order_id>/edit', methods=['POST'])

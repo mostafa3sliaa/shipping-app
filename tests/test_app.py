@@ -108,6 +108,38 @@ def test_bulk_set_shipping_fee(client):
         assert res1.shipping_fee == 75.5
         assert res2.shipping_fee == 75.5
 
+def test_bulk_action_simultaneous_fields(client):
+    with app.app_context():
+        o1 = Order(tracking_number='TRK-MULTI-1', region='قديم 1', shipping_fee=50.0, status='مخزن')
+        o2 = Order(tracking_number='TRK-MULTI-2', region='قديم 2', shipping_fee=50.0, status='مخزن')
+        db.session.add_all([o1, o2])
+        db.session.commit()
+        id1, id2 = o1.id, o2.id
+
+    # Post with courier_name, bulk_region_name, and bulk_shipping_fee at the same time
+    response = client.post('/orders/bulk_action', data={
+        'action': 'set_region',
+        'order_ids': [str(id1), str(id2)],
+        'courier_name': 'مندوب النيل',
+        'bulk_region_name': 'فيصل',
+        'bulk_shipping_fee': '65.0'
+    }, follow_redirects=True)
+
+    assert response.status_code == 200
+    with app.app_context():
+        res1 = db.session.get(Order, id1)
+        res2 = db.session.get(Order, id2)
+        # All three must be updated together!
+        assert res1.region == 'فيصل'
+        assert res2.region == 'فيصل'
+        assert res1.shipping_fee == 65.0
+        assert res2.shipping_fee == 65.0
+        assert res1.status == 'مع المندوب'
+        assert res2.status == 'مع المندوب'
+        assert res1.courier.name == 'مندوب النيل'
+        assert res2.courier.name == 'مندوب النيل'
+
+
 def test_revert_delivered_to_warehouse(client):
     with app.app_context():
         courier = Courier(name="Courier 1")
