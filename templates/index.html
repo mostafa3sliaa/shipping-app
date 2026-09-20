@@ -168,9 +168,13 @@
             <div class="col">
                 <div class="card bg-dark text-white border-0 shadow-sm h-100" style="background: linear-gradient(45deg, #198754, #20c997) !important;">
                     <div class="card-body d-flex justify-content-between align-items-center p-3">
-                        <div>
-                            <h6 class="fw-bold text-white-50 mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-chart-line me-1"></i> الأرباح (المُحصلة)</h6>
+                        <div role="button" data-bs-toggle="modal" data-bs-target="#profitBreakdownModal" title="اضغط لعرض تفاصيل كل أوردر وأرباحه" style="cursor: pointer;">
+                            <h6 class="fw-bold text-white-50 mb-1" style="font-size: 0.85rem;">
+                                <i class="fa-solid fa-chart-line me-1"></i> الأرباح (المُحصلة)
+                                <i class="fa-solid fa-circle-info ms-1" style="font-size: 0.75rem; opacity: 0.85;"></i>
+                            </h6>
                             <h3 class="fw-bold text-white mb-0" style="font-size: 1.45rem;">{{ "{:,.2f}".format(company_profit) }} ج.م</h3>
+                            <small class="text-white-50" style="font-size: 0.7rem;"><i class="fa-solid fa-hand-pointer me-1"></i>انقر لعرض تفاصيل الـ {{ profit_orders|length }} شحنة</small>
                         </div>
                         <div class="text-end">
                             <button type="button" class="btn btn-sm btn-outline-light fw-bold shadow-sm" style="font-size: 0.75rem; padding: 3px 8px;" data-bs-toggle="modal" data-bs-target="#resetProfitModal" title="تصفير أرباح الدورة">
@@ -1528,6 +1532,114 @@
                         <i class="fa-solid fa-check me-1"></i> تأكيد تصفير الأرباح
                     </button>
                 </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal: Profit Breakdown (تفاصيل الأرباح المحصلة) -->
+<div class="modal fade" id="profitBreakdownModal" tabindex="-1" aria-labelledby="profitBreakdownModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-success text-white">
+                <h5 class="modal-title fw-bold" id="profitBreakdownModalLabel">
+                    <i class="fa-solid fa-coins me-2"></i> تفاصيل الأرباح المُحصلة (حسابات المناديب المُقفلة)
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-4">
+                <div class="row g-3 mb-4 text-center">
+                    <div class="col-md-3">
+                        <div class="p-3 bg-light rounded border">
+                            <small class="text-muted d-block fw-bold mb-1">عدد الشحنات المُحصلة</small>
+                            <span class="fs-5 fw-bold text-dark">{{ profit_orders|length }} شحنة</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 bg-light rounded border">
+                            <small class="text-muted d-block fw-bold mb-1">إجمالي أرباح الشحن</small>
+                            <span class="fs-5 fw-bold text-primary">{{ "{:,.2f}".format(profit_total_earned) }} ج.م</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 bg-light rounded border">
+                            <small class="text-muted d-block fw-bold mb-1">تصفيرات سابقة</small>
+                            <span class="fs-5 fw-bold text-danger">- {{ "{:,.2f}".format(profit_total_resets) }} ج.م</span>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="p-3 bg-success bg-opacity-10 rounded border border-success">
+                            <small class="text-success d-block fw-bold mb-1">الصافي المعروض حالياً</small>
+                            <span class="fs-5 fw-bold text-success">{{ "{:,.2f}".format(company_profit) }} ج.م</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="alert alert-info py-2 px-3 small d-flex align-items-center mb-3">
+                    <i class="fa-solid fa-circle-check fs-5 me-2"></i>
+                    <div>
+                        <strong>تنبيه دقيق:</strong> الأرباح المحصلة تُحسب حصراً من الأوردرات التي تم <strong>تقفيل حسابها فعلياً مع المندوب</strong> واستلام فلوسها في الخزينة (شحن الأوردر - حساب المندوب = صافي ربحك).
+                    </div>
+                </div>
+
+                {% if profit_orders %}
+                <div class="table-responsive" style="max-height: 420px; overflow-y: auto;">
+                    <table class="table table-hover align-middle mb-0 text-center">
+                        <thead class="table-light sticky-top">
+                            <tr>
+                                <th>#</th>
+                                <th>رقم البوليصة</th>
+                                <th>العميل</th>
+                                <th>المندوب</th>
+                                <th>الشركة / الراسل</th>
+                                <th>الحالة</th>
+                                <th>مصاريف الشحن</th>
+                                <th>حساب المندوب</th>
+                                <th>صافي الربح</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in profit_orders %}
+                            {% set o = item.order %}
+                            <tr>
+                                <td class="text-muted small">{{ loop.index }}</td>
+                                <td class="fw-bold">{{ o.tracking_number }}</td>
+                                <td>{{ o.client_name }}</td>
+                                <td><span class="badge bg-secondary">{{ o.courier.name if o.courier else 'غير محدد' }}</span></td>
+                                <td>{{ o.company.name if o.company else '—' }}</td>
+                                <td>
+                                    {% if o.status == 'تم التوصيل' %}
+                                        <span class="badge bg-success">تم التوصيل</span>
+                                    {% elif o.status == 'تسليم جزئي / مرتجع' %}
+                                        <span class="badge bg-warning text-dark">تسليم جزئي</span>
+                                    {% elif o.status in ['مرتجع', 'مرتجع شركة'] %}
+                                        <span class="badge bg-info text-dark">مرتجع بشحن</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">{{ o.status }}</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-bold text-primary">{{ "{:,.2f}".format(o.shipping_fee or 0.0) }} ج.م</td>
+                                <td class="text-muted">{{ "{:,.2f}".format(o.courier_fee or 0.0) }} ج.م</td>
+                                <td>
+                                    <span class="badge bg-success fs-6 px-2 py-1">
+                                        +{{ "{:,.2f}".format(item.profit) }} ج.م
+                                    </span>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="fa-solid fa-receipt fa-3x mb-3 text-secondary opacity-50"></i>
+                    <p class="mb-0">لا توجد أوردرات مُقفلة مع المناديب حتى الآن.</p>
+                    <small>عند تقفيل حساب أي مندوب ستظهر أرباح الشحن الصافية هنا تلقائياً.</small>
+                </div>
+                {% endif %}
+            </div>
+            <div class="modal-footer bg-light">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
             </div>
         </div>
     </div>

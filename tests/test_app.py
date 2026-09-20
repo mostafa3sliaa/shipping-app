@@ -759,6 +759,71 @@ def test_filters_all_none_specific(client):
     assert 'TRK-F2' not in text7
     assert 'TRK-F3' not in text7
 
+def test_strictly_settled_company_profit(client):
+    """
+    Ensure that company_profit strictly counts orders with courier_settled == True.
+    Unsettled orders marked 'تم التوصيل' must NOT inflate company_profit!
+    """
+    with app.app_context():
+        courier = Courier(name="Ali Courier", phone="0100000000")
+        company = Company(name="Test Brand")
+        db.session.add_all([courier, company])
+        db.session.commit()
+
+        # 7 settled orders with shipping_fee=70, courier_fee=50 -> Net profit = 20 * 7 = 140
+        for i in range(1, 8):
+            o = Order(
+                tracking_number=f'TRK-SETTLED-{i}',
+                courier_id=courier.id,
+                company_id=company.id,
+                status='تم التوصيل',
+                cod=300.0,
+                shipping_fee=70.0,
+                courier_fee=50.0,
+                courier_settled=True,
+                collected_amount=300.0
+            )
+            db.session.add(o)
+
+        # 2 unsettled delivered orders with shipping_fee=185 each (total 370)
+        # These must NOT be added to company_profit!
+        o_unsettled1 = Order(
+            tracking_number='TRK-UNSETTLED-1',
+            company_id=company.id,
+            status='تم التوصيل',
+            cod=500.0,
+            shipping_fee=185.0,
+            courier_fee=0.0,
+            courier_settled=False
+        )
+        o_unsettled2 = Order(
+            tracking_number='TRK-UNSETTLED-2',
+            company_id=company.id,
+            status='تم التوصيل',
+            cod=500.0,
+            shipping_fee=185.0,
+            courier_fee=0.0,
+            courier_settled=False
+        )
+        db.session.add_all([o_unsettled1, o_unsettled2])
+        db.session.commit()
+
+    resp = client.get('/')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    # The profit MUST be 140.00 ج.م and NOT 510.00 ج.م!
+    assert '140.00 ج.م' in html
+    assert '510.00' not in html
+
+    # Verify modal exists and shows 7 settled shipments, and does NOT include unsettled orders
+    assert 'تفاصيل الأرباح المُحصلة' in html
+    assert 'id="profitBreakdownModal"' in html
+    modal_part = html[html.find('id="profitBreakdownModal"'):]
+    assert 'TRK-SETTLED-1' in modal_part
+    assert 'TRK-UNSETTLED-1' not in modal_part
+
+
 
 
 

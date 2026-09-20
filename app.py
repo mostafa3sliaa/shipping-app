@@ -239,6 +239,45 @@ def logout():
     flash('تم تسجيل الخروج', 'info')
     return redirect(url_for('login'))
 
+def get_company_profit_data():
+    """
+    Calculate collected net shipping profit strictly from settled orders (courier_settled == True).
+    Returns (company_profit, total_earned, total_profit_resets, profit_orders).
+    """
+    settled_orders = Order.query.options(
+        joinedload(Order.courier),
+        joinedload(Order.company)
+    ).filter(
+        Order.courier_settled == True,
+        or_(
+            Order.status.in_(['تم التوصيل', 'تسليم جزئي / مرتجع']),
+            and_(Order.status.in_(['مرتجع', 'مرتجع شركة']), Order.collected_amount > 0)
+        )
+    ).order_by(Order.id.desc()).all()
+
+    total_earned = 0.0
+    profit_orders = []
+    for o in settled_orders:
+        ship = o.shipping_fee or 0.0
+        fee = o.courier_fee or 0.0
+        if o.status in ['تم التوصيل', 'تسليم جزئي / مرتجع']:
+            profit = ship - fee
+        else:
+            coll = o.collected_amount or ship
+            profit = min(coll, ship) - fee
+        total_earned += profit
+        profit_orders.append({
+            'order': o,
+            'profit': profit
+        })
+
+    total_profit_resets = db.session.query(
+        db.func.sum(TreasuryTransaction.amount)
+    ).filter_by(tx_type='تصفير_أرباح').scalar() or 0.0
+
+    company_profit = max(0.0, total_earned - total_profit_resets)
+    return company_profit, total_earned, total_profit_resets, profit_orders
+
 @app.route('/')
 @login_required
 def index():
@@ -246,28 +285,25 @@ def index():
     active_tab = request.args.get('tab', 'dashboard')
     scanned_tracking = request.args.get('scanned', None)
     
-    # 1. Fetch all Status counts, goods sums, and profits in ONE combined query
+    # 1. Fetch all Status counts, goods sums in ONE combined query
     metrics = db.session.query(
         Order.status,
         db.func.count(Order.id),
         db.func.sum(Order.cod),
         db.func.sum(Order.shipping_fee),
-        db.func.sum(Order.collected_amount),
-        db.func.sum(Order.courier_fee)
+        db.func.sum(Order.collected_amount)
     ).group_by(Order.status).all()
     
     status_dict = {}
     total_orders = 0
     full_goods = 0.0
     partial_goods = 0.0
-    company_profit = 0.0
     
-    for st, count, cod_sum, shipping_sum, collected_sum, courier_fee_sum in metrics:
+    for st, count, cod_sum, shipping_sum, collected_sum in metrics:
         cnt = count or 0
         cod_s = cod_sum or 0.0
         ship_s = shipping_sum or 0.0
         coll_s = collected_sum or 0.0
-        fee_s = courier_fee_sum or 0.0
         
         status_dict[st] = cnt
         total_orders += cnt
@@ -276,24 +312,9 @@ def index():
             full_goods += (cod_s - ship_s)
         if st == 'تسليم جزئي / مرتجع':
             partial_goods += (cod_s - coll_s)
-        if st in ['تم التوصيل', 'تسليم جزئي / مرتجع']:
-            company_profit += (ship_s - fee_s)
             
-    # Include shipping profit for returned orders (regular return with shipping or returned to company) where shipping was collected
-    returned_with_shipping_profit = db.session.query(
-        db.func.sum(db.func.coalesce(Order.collected_amount, Order.shipping_fee) - db.func.coalesce(Order.courier_fee, 0.0))
-    ).filter(
-        Order.status.in_(['مرتجع', 'مرتجع شركة']),
-        Order.collected_amount > 0,
-        Order.courier_settled == True
-    ).scalar() or 0.0
-    company_profit += returned_with_shipping_profit
-
-    # Deduct previous profit resets so profit starts from 0 for the new cycle without touching treasury
-    total_profit_resets = db.session.query(
-        db.func.sum(TreasuryTransaction.amount)
-    ).filter_by(tx_type='تصفير_أرباح').scalar() or 0.0
-    company_profit = max(0.0, company_profit - total_profit_resets)
+    # Calculate collected profit strictly from settled orders (courier_settled == True)
+    company_profit, profit_total_earned, profit_total_resets, profit_orders = get_company_profit_data()
 
     total_goods = full_goods + partial_goods
     new_in_warehouse = status_dict.get('مخزن', 0)
@@ -491,6 +512,9 @@ def index():
                            treasury_cash=treasury_cash,
                            treasury_transfer=treasury_transfer,
                            company_profit=company_profit,
+                           profit_orders=profit_orders,
+                           profit_total_earned=profit_total_earned,
+                           profit_total_resets=profit_total_resets,
                            active_couriers=active_couriers,
                            new_in_warehouse=new_in_warehouse,
                            postponed=postponed,
@@ -1463,33 +1487,7 @@ def treasury_withdraw_wallet():
 @login_required
 def treasury_reset_profit():
     try:
-        metrics = db.session.query(
-            Order.status,
-            db.func.sum(Order.shipping_fee),
-            db.func.sum(Order.courier_fee)
-        ).group_by(Order.status).all()
-        
-        total_earned = 0.0
-        for st, shipping_sum, courier_fee_sum in metrics:
-            ship_s = shipping_sum or 0.0
-            fee_s = courier_fee_sum or 0.0
-            if st in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
-                total_earned += (ship_s - fee_s)
-                
-        partial_returned_company_profit = db.session.query(
-            db.func.sum(Order.shipping_fee - db.func.coalesce(Order.courier_fee, 0.0))
-        ).filter(
-            Order.status == 'مرتجع شركة',
-            Order.collected_amount > 0,
-            Order.courier_settled == True
-        ).scalar() or 0.0
-        total_earned += partial_returned_company_profit
-        
-        total_reset = db.session.query(
-            db.func.sum(TreasuryTransaction.amount)
-        ).filter_by(tx_type='تصفير_أرباح').scalar() or 0.0
-        
-        current_displayed_profit = max(0.0, total_earned - total_reset)
+        current_displayed_profit, total_earned, total_reset, _ = get_company_profit_data()
         notes = request.form.get('notes', 'تصفير أرباح الدورة الحالية').strip()
         
         if current_displayed_profit > 0:
