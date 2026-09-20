@@ -211,6 +211,9 @@ with app.app_context():
                 default_admin = User(username='admin', password_hash=hashed, role='admin')
                 db.session.add(default_admin)
                 db.session.commit()
+        # Migrate any legacy 'مرتجع بشحن' status to standard 'مرتجع'
+        Order.query.filter_by(status='مرتجع بشحن').update({'status': 'مرتجع'})
+        db.session.commit()
     except Exception:
         pass
 
@@ -269,22 +272,22 @@ def index():
         status_dict[st] = cnt
         total_orders += cnt
         
-        if st not in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن']:
+        if st not in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع شركة']:
             full_goods += (cod_s - ship_s)
         if st == 'تسليم جزئي / مرتجع':
             partial_goods += (cod_s - coll_s)
-        if st in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
+        if st in ['تم التوصيل', 'تسليم جزئي / مرتجع']:
             company_profit += (ship_s - fee_s)
             
-    # Include shipping profit for partial delivery orders whose returned goods portion was transferred to 'مرتجع شركة'
-    partial_returned_company_profit = db.session.query(
-        db.func.sum(Order.shipping_fee - db.func.coalesce(Order.courier_fee, 0.0))
+    # Include shipping profit for returned orders (regular return with shipping or returned to company) where shipping was collected
+    returned_with_shipping_profit = db.session.query(
+        db.func.sum(db.func.coalesce(Order.collected_amount, Order.shipping_fee) - db.func.coalesce(Order.courier_fee, 0.0))
     ).filter(
-        Order.status == 'مرتجع شركة',
+        Order.status.in_(['مرتجع', 'مرتجع شركة']),
         Order.collected_amount > 0,
         Order.courier_settled == True
     ).scalar() or 0.0
-    company_profit += partial_returned_company_profit
+    company_profit += returned_with_shipping_profit
 
     # Deduct previous profit resets so profit starts from 0 for the new cycle without touching treasury
     total_profit_resets = db.session.query(
@@ -420,7 +423,7 @@ def index():
     companies = Company.query.order_by(Company.name).all()
     
     # All canonical statuses for modals and forms
-    all_statuses = ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع', 'مرتجع شركة', 'مرتجع بشحن', 'مؤجل']
+    all_statuses = ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع', 'مرتجع شركة', 'مؤجل']
     
     # Active statuses in DB for filters
     db_statuses = [r[0] for r in db.session.query(Order.status).distinct().all()]
@@ -1161,8 +1164,12 @@ def edit_order(order_id):
     order.status = new_status
 
     # Status transitions & Treasury accounting logic
-    if new_status in ['مخزن', 'مع المندوب', 'مؤجل', 'مرتجع']:
-        # Leaving delivered/partial status: immediately reverse any courier collection from treasury
+    new_collected = order.collected_amount or 0.0
+    new_fee = order.courier_fee or 0.0
+    new_net = new_collected - new_fee
+
+    if new_status in ['مخزن', 'مع المندوب', 'مؤجل']:
+        # Leaving delivered/return settlement to go back to warehouse or courier:
         if old_settled and old_net > 0:
             reverse_order_treasury_collection(order, reason=f'تغيير الحالة إلى {new_status}', amount=old_net)
         else:
@@ -1174,35 +1181,38 @@ def edit_order(order_id):
         if new_status == 'مخزن' and not courier_name:
             order.courier_id = None
             
-    elif new_status in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
-        new_collected = order.collected_amount or 0.0
-        new_fee = order.courier_fee or 0.0
-        new_net = new_collected - new_fee
-        
-        if not old_settled and new_net > 0:
-            # First-time settlement via edit modal
-            tx = TreasuryTransaction(
-                amount=new_net,
-                method='كاش',
-                tx_type='تحصيل_من_مندوب',
-                entity_id=order.courier_id,
-                notes=f'تحصيل نقدي للأوردر {order.tracking_number} ({new_status})'
-            )
-            db.session.add(tx)
-            order.courier_settled = True
-        elif old_settled:
-            # Already settled before, adjust if amounts changed
-            diff = new_net - old_net
-            if diff != 0:
+    elif new_status in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع']:
+        if new_net > 0:
+            if not old_settled:
+                # First-time settlement via edit modal
                 tx = TreasuryTransaction(
-                    amount=diff,
+                    amount=new_net,
                     method='كاش',
-                    tx_type='تعديل_تحصيل',
+                    tx_type='تحصيل_من_مندوب',
                     entity_id=order.courier_id,
-                    notes=f'تعديل تحصيل للأوردر {order.tracking_number} (فارق {diff:+.2f} ج.م)'
+                    notes=f'تحصيل نقدي للأوردر {order.tracking_number} ({new_status})'
                 )
                 db.session.add(tx)
-                
+                order.courier_settled = True
+            elif old_settled:
+                # Already settled before, adjust if amounts changed
+                diff = new_net - old_net
+                if diff != 0:
+                    tx = TreasuryTransaction(
+                        amount=diff,
+                        method='كاش',
+                        tx_type='تعديل_تحصيل',
+                        entity_id=order.courier_id,
+                        notes=f'تعديل تحصيل للأوردر {order.tracking_number} (فارق {diff:+.2f} ج.م)'
+                    )
+                    db.session.add(tx)
+        else:
+            # new_net is 0 (regular return without fees)
+            if old_status != new_status and old_settled and old_net > 0:
+                reverse_order_treasury_collection(order, reason=f'تحويل إلى {new_status} بدون تحصيل', amount=old_net)
+            elif not old_settled:
+                order.collected_amount = 0.0
+
     elif new_status == 'مرتجع شركة':
         if old_settled and old_net > 0 and old_status == 'تم التوصيل':
             reverse_order_treasury_collection(order, reason='تحويل لمرتجع شركة', amount=old_net)
@@ -1609,11 +1619,11 @@ def courier_accounting():
                                 order.courier_settled = True
                                 settled_count += 1
                             elif new_status in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
-                                order.status = new_status
+                                order.status = 'مرتجع' if new_status == 'مرتجع بشحن' else new_status
                                 try:
                                     order.collected_amount = float(request.form.get(f'collected_{order.id}', 0))
                                 except:
-                                    order.collected_amount = order.cod if new_status == 'تم التوصيل' else 0
+                                    order.collected_amount = order.cod if new_status == 'تم التوصيل' else (order.shipping_fee if new_status == 'مرتجع بشحن' else 0)
                                 try:
                                     order.courier_fee = float(request.form.get(f'courier_fee_{order.id}', 0))
                                 except:

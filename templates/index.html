@@ -527,10 +527,14 @@
                                             <span class="badge bg-secondary">مؤجل</span>
                                         {% elif order.status == 'مرتجع' %}
                                             <span class="badge bg-danger">مرتجع</span>
-                                        {% elif order.status == 'مرتجع بشحن' %}
-                                            <span class="badge bg-info text-dark">مرتجع بشحن</span>
+                                            {% if order.collected_amount is not none and order.collected_amount > 0 %}
+                                            <small class="text-success d-block fw-bold mt-1" style="font-size: 0.72rem;" title="تم تحصيل مصاريف الشحن من العميل بواسطة المندوب"><i class="fa-solid fa-coins me-1"></i>بتحصيل شحن: {{ "{:,.0f}".format(order.collected_amount) }}</small>
+                                            {% endif %}
                                         {% elif order.status == 'مرتجع شركة' %}
                                             <span class="badge bg-dark">مرتجع شركة</span>
+                                            {% if order.collected_amount is not none and order.collected_amount > 0 %}
+                                            <small class="text-success d-block fw-bold mt-1" style="font-size: 0.72rem;" title="تم تحصيل مصاريف الشحن من العميل"><i class="fa-solid fa-coins me-1"></i>بتحصيل شحن: {{ "{:,.0f}".format(order.collected_amount) }}</small>
+                                            {% endif %}
                                         {% else %}
                                             <span class="badge bg-dark">{{ order.status }}</span>
                                         {% endif %}
@@ -1042,10 +1046,8 @@
             statusBadge = '<span class="badge bg-warning text-dark border border-dark"><i class="fa-solid fa-box-tissue me-1"></i> تسليم جزئي / مرتجع</span>';
         } else if (st === 'مؤجل') {
             statusBadge = '<span class="badge bg-secondary">مؤجل</span>';
-        } else if (st === 'مرتجع') {
+        } else if (st === 'مرتجع' || st === 'مرتجع بشحن') {
             statusBadge = '<span class="badge bg-danger">مرتجع</span>';
-        } else if (st === 'مرتجع بشحن') {
-            statusBadge = '<span class="badge bg-info text-dark">مرتجع بشحن</span>';
         } else if (st === 'مرتجع شركة') {
             statusBadge = '<span class="badge bg-dark">مرتجع شركة</span>';
         } else {

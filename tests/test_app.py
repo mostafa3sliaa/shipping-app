@@ -618,6 +618,82 @@ def test_order_creation_and_search_with_arabic_phone(client):
         updated = db.session.get(Order, order_id)
         assert updated.phone == '01599988877 - 01011122233'
 
+def test_return_with_shipping_flow(client):
+    with app.app_context():
+        comp = Company(name="شركة الأمل")
+        cour = Courier(name="مندوب التوصيل")
+        db.session.add_all([comp, cour])
+        db.session.commit()
+        
+        order = Order(
+            tracking_number='TRK-RET-SHIP',
+            client_name='محمود حسن',
+            phone='01099887766',
+            cod=400.0,
+            shipping_fee=60.0,
+            status='مع المندوب',
+            company_id=comp.id,
+            courier_id=cour.id
+        )
+        db.session.add(order)
+        db.session.commit()
+        order_id = order.id
+        cour_id = cour.id
+        comp_id = comp.id
+
+    # 1. Settle courier with option 'مرتجع بشحن'
+    # Collected = 60, courier fee = 40, net cash = 20
+    res_settle = client.post(f'/accounting/courier?courier_id={cour_id}', data={
+        'action': 'settle',
+        f'status_{order_id}': 'مرتجع بشحن',
+        f'collected_{order_id}': '60',
+        f'courier_fee_{order_id}': '40',
+        'transfers': '0'
+    }, follow_redirects=True)
+    assert res_settle.status_code == 200
+
+    # Verify: order status is 'مرتجع' (not a separate status 'مرتجع بشحن'), courier_settled is True
+    with app.app_context():
+        o = db.session.get(Order, order_id)
+        assert o.status == 'مرتجع'
+        assert o.courier_settled is True
+        assert o.collected_amount == 60.0
+        assert o.courier_fee == 40.0
+
+        # Treasury received net cash 20
+        tx = TreasuryTransaction.query.filter_by(entity_id=cour_id, tx_type='تحصيل_من_مندوب').first()
+        assert tx is not None
+        assert tx.amount == 20.0
+
+    # Verify dashboard metrics
+    res_dash = client.get('/?tab=dashboard')
+    assert res_dash.status_code == 200
+    # Returned card should count it
+    res_orders = client.get('/?tab=orders&status=مرتجع')
+    assert res_orders.status_code == 200
+    assert 'TRK-RET-SHIP' in res_orders.get_data(as_text=True)
+
+    # 2. Convert to company return: 'مرتجع شركة'
+    res_bulk = client.post('/orders/bulk_action', data={
+        'action': 'return_company',
+        'order_ids': [str(order_id)]
+    }, follow_redirects=True)
+    assert res_bulk.status_code == 200
+
+    with app.app_context():
+        o = db.session.get(Order, order_id)
+        assert o.status == 'مرتجع شركة'
+        # Treasury cash not reversed
+        txs = TreasuryTransaction.query.filter_by(entity_id=cour_id).all()
+        assert len(txs) == 1
+        assert txs[0].amount == 20.0
+
+    # 3. Check company accounting: order is ready under company returns
+    res_comp = client.get(f'/accounting/company?company_id={comp_id}')
+    assert res_comp.status_code == 200
+    assert 'TRK-RET-SHIP' in res_comp.get_data(as_text=True)
+
+
 
 
 
