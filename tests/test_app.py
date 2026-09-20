@@ -488,6 +488,50 @@ def test_api_scan_and_database_search(client):
     assert search_trk.status_code == 200
     assert b'SHP-A7D8A6' in search_trk.data
 
+def test_manual_order_with_courier_and_edit_courier(client):
+    # 1. Create manual order with optional courier
+    response = client.post('/order/new', data={
+        'client_name': 'عمر',
+        'phone': '01123456789',
+        'address': 'Giza',
+        'region': 'الدقي',
+        'cod': '500',
+        'shipping_fee': '50',
+        'courier_name': 'مندوب يدوي'
+    }, follow_redirects=True)
+    assert response.status_code == 200
+
+    with app.app_context():
+        order = Order.query.filter_by(phone='01123456789').first()
+        assert order is not None
+        assert order.status == 'مع المندوب'
+        assert order.courier is not None
+        assert order.courier.name == 'مندوب يدوي'
+
+    # 2. Edit an order from 'مخزن' by adding a courier name
+    with app.app_context():
+        o_wh = Order(tracking_number='TRK-WH-EDIT', client_name='سعيد', phone='01198765432', cod=300, status='مخزن')
+        db.session.add(o_wh)
+        db.session.commit()
+        wh_id = o_wh.id
+
+    # Post edit with courier_name while status was 'مخزن' in form
+    res_edit = client.post(f'/order/{wh_id}/edit', data={
+        'client_name': 'سعيد',
+        'phone': '01198765432',
+        'cod': '300',
+        'status': 'مخزن',
+        'courier_name': 'مندوب تم إضافته'
+    }, follow_redirects=True)
+    assert res_edit.status_code == 200
+
+    with app.app_context():
+        updated_wh = db.session.get(Order, wh_id)
+        assert updated_wh.courier is not None
+        assert updated_wh.courier.name == 'مندوب تم إضافته'
+        assert updated_wh.status == 'مع المندوب'
+
+
 
 
 

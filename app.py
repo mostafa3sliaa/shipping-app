@@ -543,6 +543,18 @@ def new_order():
             db.session.add(company)
             db.session.flush()
         company_id = company.id
+
+    courier_name = request.form.get('courier_name', '').strip()
+    courier_id = None
+    status = 'مخزن'
+    if courier_name:
+        courier = Courier.query.filter_by(name=courier_name).first()
+        if not courier:
+            courier = Courier(name=courier_name)
+            db.session.add(courier)
+            db.session.flush()
+        courier_id = courier.id
+        status = 'مع المندوب'
         
     try:
         cod = float(request.form.get('cod', 0.0))
@@ -561,8 +573,9 @@ def new_order():
         content=content,
         cod=cod,
         shipping_fee=shipping_fee,
-        status='مخزن',
-        company_id=company_id
+        status=status,
+        company_id=company_id,
+        courier_id=courier_id
     )
     db.session.add(order)
     db.session.commit()
@@ -1040,7 +1053,9 @@ def edit_order(order_id):
                 db.session.add(c)
                 db.session.flush()
             order.courier_id = c.id
-        else:
+            if new_status in ['مخزن', 'جديد بالمخزن']:
+                new_status = 'مع المندوب'
+        elif 'courier_name' in request.form and not courier_name:
             order.courier_id = None
             
     except ValueError:
@@ -1059,7 +1074,7 @@ def edit_order(order_id):
             order.collected_amount = None
             order.courier_fee = None
             
-        if new_status == 'مخزن':
+        if new_status == 'مخزن' and not courier_name:
             order.courier_id = None
             
     elif new_status in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
