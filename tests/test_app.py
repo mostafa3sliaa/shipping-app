@@ -531,6 +531,93 @@ def test_manual_order_with_courier_and_edit_courier(client):
         assert updated_wh.courier.name == 'مندوب تم إضافته'
         assert updated_wh.status == 'مع المندوب'
 
+def test_clean_phone_smart_all_formats():
+    from app import clean_phone_smart
+    
+    # 1. Arabic digits
+    assert clean_phone_smart('٠١٠١٢٣٤٥٦٧٨') == '01012345678'
+    
+    # 2. Multi-number with slash and Arabic digits
+    assert clean_phone_smart('٠١٠١٢٣٤٥٦٧٨ / ٠١١٩٨٧٦٥٤٣٢') == '01012345678 - 01198765432'
+    assert clean_phone_smart('٠١٠١٢٣٤٥٦٧٨/٠١١٩٨٧٦٥٤٣٢') == '01012345678 - 01198765432'
+    
+    # 3. Word delimiters: أو / او / و
+    assert clean_phone_smart('01012345678 او 01198765432') == '01012345678 - 01198765432'
+    assert clean_phone_smart('01012345678 أو 01198765432') == '01012345678 - 01198765432'
+    assert clean_phone_smart('01012345678 و 01198765432') == '01012345678 - 01198765432'
+    
+    # 4. Commas and symbols: ، , | ;
+    assert clean_phone_smart('01012345678،01198765432') == '01012345678 - 01198765432'
+    assert clean_phone_smart('01012345678, 01198765432') == '01012345678 - 01198765432'
+    assert clean_phone_smart('01012345678 | 01198765432') == '01012345678 - 01198765432'
+    
+    # 5. Dashes between two numbers vs internal phone dash
+    assert clean_phone_smart('01012345678 - 01198765432') == '01012345678 - 01198765432'
+    assert clean_phone_smart('01012345678-01198765432') == '01012345678 - 01198765432'
+    assert clean_phone_smart('010-1234-5678') == '01012345678'
+    assert clean_phone_smart('010 1234 5678') == '01012345678'
+    
+    # 6. Two numbers separated by spaces
+    assert clean_phone_smart('01012345678 01198765432') == '01012345678 - 01198765432'
+    
+    # 7. Float representations and missing leading zero
+    assert clean_phone_smart('1012345678.0') == '01012345678'
+    assert clean_phone_smart(1012345678.0) == '01012345678'
+    assert clean_phone_smart('1012345678') == '01012345678'
+    
+    # 8. Country codes (+20, 0020, 20)
+    assert clean_phone_smart('+201012345678') == '01012345678'
+    assert clean_phone_smart('00201012345678') == '01012345678'
+    assert clean_phone_smart('201012345678') == '01012345678'
+    
+    # 9. None, empty, NaN
+    assert clean_phone_smart(None) == ''
+    assert clean_phone_smart('') == ''
+    assert clean_phone_smart('nan') == ''
+
+def test_order_creation_and_search_with_arabic_phone(client):
+    # Create order with Arabic digits and slash
+    response = client.post('/order/new', data={
+        'client_name': 'أحمد إبراهيم',
+        'phone': '٠١٠١١١٢٢٢٣٣ / ٠١٢٣٣٣٤٤٤٥٥',
+        'address': 'مدينة نصر',
+        'region': 'القاهرة',
+        'cod': '500',
+        'shipping_fee': '50'
+    }, follow_redirects=True)
+    assert response.status_code == 200
+    
+    with app.app_context():
+        order = Order.query.filter_by(client_name='أحمد إبراهيم').first()
+        assert order is not None
+        assert order.phone == '01011122233 - 01233344455'
+        order_id = order.id
+
+    # Search in index with Arabic digits
+    res_search = client.get('/?search=٠١٠١١١٢٢٢٣٣')
+    assert res_search.status_code == 200
+    assert '01011122233 - 01233344455' in res_search.get_data(as_text=True)
+
+    # Search via api_scan with Arabic digits
+    res_api = client.get('/api/scan?q=٠١٠١١١٢٢٢٣٣')
+    assert res_api.status_code == 200
+    data = res_api.get_json()
+    assert len(data['orders']) == 1
+    assert data['orders'][0]['phone'] == '01011122233 - 01233344455'
+
+    # Edit phone using Arabic digits with word 'او'
+    res_edit = client.post(f'/order/{order_id}/edit', data={
+        'client_name': 'أحمد إبراهيم',
+        'phone': '٠١٥٩٩٩٨٨٨٧٧ او ٠١٠١١١٢٢٢٣٣',
+        'cod': '500',
+        'status': 'مخزن'
+    }, follow_redirects=True)
+    assert res_edit.status_code == 200
+
+    with app.app_context():
+        updated = db.session.get(Order, order_id)
+        assert updated.phone == '01599988877 - 01011122233'
+
 
 
 

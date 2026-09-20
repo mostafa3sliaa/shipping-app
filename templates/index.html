@@ -784,6 +784,62 @@
 </div>
 
 <script>
+    function cleanPhoneSmartJs(val) {
+        if (!val) return '';
+        const arabicDigits = '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹';
+        const englishDigits = '01234567890123456789';
+        let s = val.toString().replace(/[٠-٩۰-۹]/g, function(d) {
+            const idx = arabicDigits.indexOf(d);
+            return idx !== -1 ? englishDigits[idx] : d;
+        });
+        if (s.endsWith('.0')) s = s.slice(0, -2);
+
+        // Word separators
+        s = s.replace(/(\d|\s)(?:أو|او|\bو\b|or|and|\bw\b|مع|بديل|اخر|آخر)(\s|\d)/gi, '$1 / $2');
+        // Symbol separators
+        s = s.replace(/[/\\|,،;؛_\r\n]+/g, ' / ');
+        // Dashes separating two numbers
+        s = s.replace(/\s+-\s+/g, ' / ');
+        s = s.replace(/(\d{7,})-(\d)/g, '$1 / $2');
+        s = s.replace(/(\d)-(\d{7,})/g, '$1 / $2');
+        // Space between two numbers
+        s = s.replace(/(\d{9,11})\s+((?:01|1[0125]|\+20|0020)\d{7,})/g, '$1 / $2');
+
+        const chunks = s.split('/').map(c => c.trim()).filter(Boolean);
+        const validPhones = [];
+
+        for (let chunk of chunks) {
+            let digits = chunk.replace(/[^\d]/g, '');
+            if (!digits) continue;
+
+            let subList = [digits];
+            if (digits.length >= 20) {
+                const matches = digits.match(/(?:0020|20)?(01[0125]\d{8})/g);
+                if (matches && matches.length >= 2) {
+                    subList = matches.map(m => m.replace(/^(?:0020|20)/, ''));
+                }
+            }
+
+            for (let d of subList) {
+                if (d.startsWith('0020') && d.length >= 14) d = d.substring(4);
+                else if (d.startsWith('20') && (d.length === 12 || d.length === 13) && (d[2] === '1' || d[2] === '2')) d = d.substring(2);
+
+                if (d.length === 10 && /^(?:10|11|12|15)/.test(d)) {
+                    d = '0' + d;
+                } else if ((d.length === 8 || d.length === 9) && !d.startsWith('0') && (d.startsWith('2') || d.startsWith('3'))) {
+                    d = '0' + d;
+                }
+
+                if (d.length >= 7 && !validPhones.includes(d)) {
+                    validPhones.push(d);
+                }
+            }
+        }
+
+        return validPhones.length > 0 ? validPhones.join(' - ') : s.trim();
+    }
+    window.cleanPhoneSmartJs = cleanPhoneSmartJs;
+
     // Quick Paste Parser Logic (Multi-line section-aware parser)
     function handleQuickPaste(text) {
         if (!text || !text.trim()) return;
@@ -871,7 +927,7 @@
 
         if (data.phone.length > 0) {
             const el = modal.querySelector('input[name="phone"]');
-            if (el) el.value = data.phone.join(' / ');
+            if (el) el.value = cleanPhoneSmartJs(data.phone.join(' '));
         }
 
         let addressText = '';
@@ -933,6 +989,11 @@
             document.addEventListener('input', function(e) {
                 if (e.target && e.target.id === 'quickPasteArea') {
                     handleQuickPaste(e.target.value);
+                }
+            });
+            document.addEventListener('change', function(e) {
+                if (e.target && e.target.name === 'phone') {
+                    e.target.value = cleanPhoneSmartJs(e.target.value);
                 }
             });
         }

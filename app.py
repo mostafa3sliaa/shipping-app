@@ -105,6 +105,103 @@ class TreasuryTransaction(db.Model):
     notes = db.Column(db.String(200))
     created_at = db.Column(db.DateTime, default=datetime.now)
 
+_ARABIC_TO_ENGLISH_DIGITS = str.maketrans(
+    '٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹',
+    '01234567890123456789'
+)
+
+def clean_phone_smart(val):
+    """
+    Cleans, normalizes, and extracts Egyptian/Arab phone numbers intelligently:
+    - Converts Eastern Arabic (٠-٩) and Persian (۰-۹) numerals to ASCII (0-9).
+    - Strips Excel float decimals (.0).
+    - Splits multiple numbers separated by any delimiter (/ \\ | , ، ; ؛ _ newlines, words like او/أو/و/or/and/مع/بديل).
+    - Distinguishes formatting dashes/spaces within a number from separators between two numbers.
+    - Extracts glued Egyptian mobile numbers (e.g. 20-22 digits).
+    - Strips Egypt country codes (+20, 0020, 20) and ensures missing leading zero on 10-digit mobiles.
+    - Joins multiple distinct valid phone numbers with ' - '.
+    """
+    if val is None:
+        return ''
+    if isinstance(val, float):
+        if pd.isna(val):
+            return ''
+        if val.is_integer():
+            val = int(val)
+        else:
+            val = str(val).rstrip('0').rstrip('.')
+
+    s = str(val).strip()
+    if not s or s.lower() in ('nan', 'none', 'null'):
+        return ''
+
+    # 1. Translate Arabic/Persian digits to English ASCII digits
+    s = s.translate(_ARABIC_TO_ENGLISH_DIGITS)
+
+    # 2. Handle float string .0
+    if s.endswith('.0'):
+        s = s[:-2]
+
+    # 3. Handle explicit word separators: أو, او, و, or, and, w, مع, بديل, اخر, آخر
+    s = re.sub(r'(?i)([\d\s])(?:أو|او|\bو\b|or|and|\bw\b|مع|بديل|اخر|آخر)([\d\s])', r'\1 / \2', s)
+
+    # 4. Handle standard symbol separators: / \ | , ، ; ؛ _ and newlines
+    s = re.sub(r'[/\\|,،;؛_\r\n]+', ' / ', s)
+
+    # 5. Handle dashes separating two numbers (either surrounded by spaces or between two digit sequences >= 7 digits)
+    s = re.sub(r'\s+-\s+', ' / ', s)
+    s = re.sub(r'(\d{7,})\s*-\s*(\d+)', r'\1 / \2', s)
+    s = re.sub(r'(\d+)\s*-\s*(\d{7,})', r'\1 / \2', s)
+
+    # 6. Handle spaces separating two complete phone numbers (e.g. 01012345678 01198765432)
+    s = re.sub(r'(\d{9,11})\s+((?:01|1[0125]|\+20|0020)\d{7,})', r'\1 / \2', s)
+
+    # 7. Split into potential phone number chunks
+    raw_chunks = [c.strip() for c in s.split('/') if c.strip()]
+
+    valid_phones = []
+
+    for chunk in raw_chunks:
+        # Extract all digits from chunk
+        digits = re.sub(r'[^\d]', '', chunk)
+        if not digits:
+            continue
+
+        # Check if chunk contains two glued Egyptian mobile numbers (>= 20 digits)
+        sub_list = []
+        if len(digits) >= 20:
+            found_mobiles = re.findall(r'(?:0020|20)?(01[0125]\d{8})', digits)
+            if len(found_mobiles) >= 2:
+                sub_list = found_mobiles
+            else:
+                sub_list = [digits]
+        else:
+            sub_list = [digits]
+
+        for d in sub_list:
+            # Strip Egyptian country code
+            if d.startswith('0020') and len(d) >= 14:
+                d = d[4:]
+            elif d.startswith('20') and len(d) in (12, 13) and d[2] in '12':
+                d = d[2:]
+
+            # Add missing leading 0 for 10-digit mobile numbers starting with 10, 11, 12, 15
+            if len(d) == 10 and d.startswith(('10', '11', '12', '15')):
+                d = '0' + d
+            # Landlines missing leading 0 (e.g. Cairo 2... with 8 digits -> 02...)
+            elif len(d) in (8, 9) and not d.startswith('0') and d.startswith(('2', '3')):
+                d = '0' + d
+
+            # Minimum 7 digits for a valid number
+            if len(d) >= 7 and d not in valid_phones:
+                valid_phones.append(d)
+
+    if valid_phones:
+        return ' - '.join(valid_phones)
+
+    only_digits = re.sub(r'[^\d]', '', s)
+    return only_digits if only_digits else s.strip()
+
 with app.app_context():
     try:
         if not os.environ.get('DATABASE_URL'):
@@ -253,13 +350,18 @@ def index():
     
     if search_query:
         clean_search = search_query.strip()
+        eng_search = clean_search.translate(_ARABIC_TO_ENGLISH_DIGITS)
         query = query.filter(or_(
             Order.tracking_number.ilike(f'%{clean_search}%'),
+            Order.tracking_number.ilike(f'%{eng_search}%'),
             Order.client_name.ilike(f'%{clean_search}%'),
+            Order.client_name.ilike(f'%{eng_search}%'),
             Order.phone.ilike(f'%{clean_search}%'),
+            Order.phone.ilike(f'%{eng_search}%'),
             Order.address.ilike(f'%{clean_search}%'),
             Order.content.ilike(f'%{clean_search}%'),
-            Order.batch_id == clean_search
+            Order.batch_id == clean_search,
+            Order.batch_id == eng_search
         ))
         
     if filter_company:
@@ -529,7 +631,7 @@ def export_excel():
 @app.route('/order/new', methods=['POST'])
 def new_order():
     client_name = request.form.get('client_name', '').strip()
-    phone = request.form.get('phone', '').strip()
+    phone = clean_phone_smart(request.form.get('phone', ''))
     address = request.form.get('address', '')
     region = request.form.get('region', '')
     content = request.form.get('content', '')
@@ -680,19 +782,8 @@ def upload_file():
                     
                 try:
                     client_name = str(get_cell(row, col_map['name'])).strip()
-                    raw_phone = str(get_cell(row, col_map['phone'])).strip()
-                    
-
-                    
-                    def clean_phone(val):
-                        s = str(val).strip()
-                        if s.lower() == 'nan' or not s: return ''
-                        if s.endswith('.0'): s = s[:-2]
-                        s = re.sub(r'[^\d]', '', s)
-                        if len(s) == 10 and s.startswith('1'): s = '0' + s
-                        return s
-                    
-                    phone = clean_phone(raw_phone)
+                    raw_phone = get_cell(row, col_map['phone'])
+                    phone = clean_phone_smart(raw_phone)
                     
                     if client_name.lower() == 'nan': client_name = ''
                     if not client_name and not phone:
@@ -791,10 +882,14 @@ def api_scan():
     if not query:
         return {'error': 'No query provided'}, 400
         
+    eng_query = query.translate(_ARABIC_TO_ENGLISH_DIGITS)
     orders = Order.query.options(joinedload(Order.company), joinedload(Order.courier)).filter(or_(
         Order.tracking_number.ilike(f'%{query}%'),
+        Order.tracking_number.ilike(f'%{eng_query}%'),
         Order.phone.ilike(f'%{query}%'),
-        Order.client_name.ilike(f'%{query}%')
+        Order.phone.ilike(f'%{eng_query}%'),
+        Order.client_name.ilike(f'%{query}%'),
+        Order.client_name.ilike(f'%{eng_query}%')
     )).all()
     
     if not orders:
@@ -1012,7 +1107,9 @@ def edit_order(order_id):
     old_net = old_collected - old_fee
     
     order.client_name = request.form.get('client_name', order.client_name)
-    order.phone = request.form.get('phone', order.phone)
+    raw_phone = request.form.get('phone')
+    if raw_phone is not None:
+        order.phone = clean_phone_smart(raw_phone)
     order.address = request.form.get('address', order.address)
     order.region = request.form.get('region', order.region)
     new_status = request.form.get('status', order.status)
