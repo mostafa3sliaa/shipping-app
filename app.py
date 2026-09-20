@@ -7,7 +7,7 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from sqlalchemy.orm import joinedload
-from sqlalchemy import or_, text
+from sqlalchemy import or_, and_, text
 from sqlalchemy.pool import NullPool
 from datetime import datetime
 from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
@@ -370,6 +370,8 @@ def index():
     if filter_company:
         if filter_company == 'none':
             query = query.filter(Order.company_id.is_(None))
+        elif filter_company == 'all':
+            query = query.filter(Order.company_id.isnot(None))
         else:
             query = query.filter_by(company_id=filter_company)
         
@@ -382,12 +384,16 @@ def index():
     if filter_courier:
         if filter_courier == 'none':
             query = query.filter(Order.courier_id.is_(None))
+        elif filter_courier == 'all':
+            query = query.filter(Order.courier_id.isnot(None))
         else:
             query = query.filter_by(courier_id=filter_courier)
         
     if filter_region:
         if filter_region == 'none':
             query = query.filter(or_(Order.region.is_(None), Order.region == '', Order.region == 'غير محدد'))
+        elif filter_region == 'all':
+            query = query.filter(and_(Order.region.isnot(None), Order.region != '', Order.region != 'غير محدد'))
         else:
             query = query.filter_by(region=filter_region)
         
@@ -541,6 +547,8 @@ def export_excel():
     if filter_company:
         if filter_company == 'none':
             query = query.filter(Order.company_id.is_(None))
+        elif filter_company == 'all':
+            query = query.filter(Order.company_id.isnot(None))
         else:
             query = query.filter_by(company_id=filter_company)
     if filter_status:
@@ -551,11 +559,15 @@ def export_excel():
     if filter_courier:
         if filter_courier == 'none':
             query = query.filter(Order.courier_id.is_(None))
+        elif filter_courier == 'all':
+            query = query.filter(Order.courier_id.isnot(None))
         else:
             query = query.filter_by(courier_id=filter_courier)
     if filter_region:
         if filter_region == 'none':
             query = query.filter(or_(Order.region.is_(None), Order.region == '', Order.region == 'غير محدد'))
+        elif filter_region == 'all':
+            query = query.filter(and_(Order.region.isnot(None), Order.region != '', Order.region != 'غير محدد'))
         else:
             query = query.filter_by(region=filter_region)
     if filter_duplicates == '1':

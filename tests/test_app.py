@@ -693,6 +693,73 @@ def test_return_with_shipping_flow(client):
     assert res_comp.status_code == 200
     assert 'TRK-RET-SHIP' in res_comp.get_data(as_text=True)
 
+def test_filters_all_none_specific(client):
+    with app.app_context():
+        comp = Company(name="شركة الفلاتر")
+        cour = Courier(name="مندوب الفلاتر")
+        db.session.add_all([comp, cour])
+        db.session.commit()
+
+        # Order 1: has courier, has company, has region, status 'مرتجع'
+        o1 = Order(tracking_number='TRK-F1', client_name='عميل 1', phone='01011111111', cod=100, status='مرتجع', courier_id=cour.id, company_id=comp.id, region='المعادي')
+        # Order 2: NO courier, has company, NO region, status 'مرتجع'
+        o2 = Order(tracking_number='TRK-F2', client_name='عميل 2', phone='01022222222', cod=200, status='مرتجع', courier_id=None, company_id=comp.id, region=None)
+        # Order 3: has courier, NO company, NO region, status 'مخزن'
+        o3 = Order(tracking_number='TRK-F3', client_name='عميل 3', phone='01033333333', cod=300, status='مخزن', courier_id=cour.id, company_id=None, region='')
+        
+        db.session.add_all([o1, o2, o3])
+        db.session.commit()
+
+    # Test 1: courier_id='all' (only with courier)
+    r1 = client.get('/?courier_id=all')
+    text1 = r1.get_data(as_text=True)
+    assert 'TRK-F1' in text1
+    assert 'TRK-F3' in text1
+    assert 'TRK-F2' not in text1
+
+    # Test 2: courier_id='none' (only without courier)
+    r2 = client.get('/?courier_id=none')
+    text2 = r2.get_data(as_text=True)
+    assert 'TRK-F2' in text2
+    assert 'TRK-F1' not in text2
+    assert 'TRK-F3' not in text2
+
+    # Test 3: status='مرتجع' AND courier_id='all' (only returns that have couriers)
+    r3 = client.get('/?status=مرتجع&courier_id=all')
+    text3 = r3.get_data(as_text=True)
+    assert 'TRK-F1' in text3
+    assert 'TRK-F2' not in text3
+    assert 'TRK-F3' not in text3
+
+    # Test 4: status='مرتجع' AND courier_id='none' (only returns that have no courier)
+    r4 = client.get('/?status=مرتجع&courier_id=none')
+    text4 = r4.get_data(as_text=True)
+    assert 'TRK-F2' in text4
+    assert 'TRK-F1' not in text4
+    assert 'TRK-F3' not in text4
+
+    # Test 5: status='مرتجع' AND courier_id='' (all returns regardless of courier)
+    r5 = client.get('/?status=مرتجع')
+    text5 = r5.get_data(as_text=True)
+    assert 'TRK-F1' in text5
+    assert 'TRK-F2' in text5
+    assert 'TRK-F3' not in text5
+
+    # Test 6: company_id='all'
+    r6 = client.get('/?company_id=all')
+    text6 = r6.get_data(as_text=True)
+    assert 'TRK-F1' in text6
+    assert 'TRK-F2' in text6
+    assert 'TRK-F3' not in text6
+
+    # Test 7: region='all'
+    r7 = client.get('/?region=all')
+    text7 = r7.get_data(as_text=True)
+    assert 'TRK-F1' in text7
+    assert 'TRK-F2' not in text7
+    assert 'TRK-F3' not in text7
+
+
 
 
 
