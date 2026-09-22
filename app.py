@@ -424,11 +424,13 @@ def index():
             query = query.filter(or_(Order.status.is_(None), Order.status == ''))
         elif filter_status == 'all_returns':
             query = query.filter(Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']))
+        elif filter_status == 'all_inclusive':
+            pass
         else:
             query = query.filter_by(status=filter_status)
     else:
         if not search_query:
-            query = query.filter(or_(Order.status != 'مرتجع شركة', Order.status.is_(None)))
+            query = query.filter(or_(~Order.status.in_(['مرتجع شركة', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'تسليم جزئي']), Order.status.is_(None)))
         
     if filter_courier:
         if filter_courier == 'none':
@@ -584,11 +586,13 @@ def export_excel():
                 query = query.filter(or_(Order.status.is_(None), Order.status == ''))
             elif filter_status == 'all_returns':
                 query = query.filter(Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']))
+            elif filter_status == 'all_inclusive':
+                pass
             else:
                 query = query.filter_by(status=filter_status)
         else:
             if not search_query:
-                query = query.filter(or_(Order.status != 'مرتجع شركة', Order.status.is_(None)))
+                query = query.filter(or_(~Order.status.in_(['مرتجع شركة', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'تسليم جزئي']), Order.status.is_(None)))
         if filter_courier:
             if filter_courier == 'none':
                 query = query.filter(Order.courier_id.is_(None))

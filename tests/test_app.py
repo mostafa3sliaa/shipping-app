@@ -408,8 +408,8 @@ def test_partial_delivery_display_and_reversal(client):
         db.session.add_all([o, tx])
         db.session.commit()
 
-    # 1. Test template display: Should show original COD 370.00 and Company Net 200.00
-    res = client.get('/')
+    # 1. Test template display: Should show original COD 370.00 and Company Net 200.00 when filtered or searched
+    res = client.get('/?tab=orders&status=تسليم جزئي / مرتجع')
     assert res.status_code == 200
     assert b'370.00' in res.data
     assert b'200.00' in res.data
@@ -963,22 +963,26 @@ def test_export_excel_features(client):
 
 def test_returned_company_hidden_by_default_in_orders_log(client):
     with app.app_context():
-        comp = Company(name='شركة المرتجعات المستبعدة')
+        comp = Company(name='شركة المرتجعات والمسلمات المستبعدة')
         db.session.add(comp)
         db.session.flush()
 
         active_ord = Order(tracking_number='ACT-WH-001', company_id=comp.id, status='مخزن', cod=400.0, shipping_fee=50.0)
         returned_co_ord = Order(tracking_number='RET-CO-999', company_id=comp.id, status='مرتجع شركة', cod=700.0, shipping_fee=60.0)
-        db.session.add_all([active_ord, returned_co_ord])
+        delivered_ord = Order(tracking_number='DEL-999', company_id=comp.id, status='تم التوصيل', cod=550.0, shipping_fee=50.0)
+        partial_ord = Order(tracking_number='PART-999', company_id=comp.id, status='تسليم جزئي / مرتجع', cod=600.0, shipping_fee=50.0, collected_amount=300.0)
+        db.session.add_all([active_ord, returned_co_ord, delivered_ord, partial_ord])
         db.session.commit()
         comp_id = comp.id
 
-    # 1. Default orders log for this company (filter_status is empty): 'مرتجع شركة' must be hidden!
+    # 1. Default orders log for this company (filter_status is empty): 'مرتجع شركة', 'تم التوصيل', and 'تسليم جزئي / مرتجع' must be hidden!
     res_default = client.get(f'/?tab=orders&company_id={comp_id}')
     assert res_default.status_code == 200
     html_default = res_default.get_data(as_text=True)
     assert 'ACT-WH-001' in html_default
     assert 'RET-CO-999' not in html_default
+    assert 'DEL-999' not in html_default
+    assert 'PART-999' not in html_default
 
     # 2. When explicitly filtering by status='مرتجع شركة': 'مرتجع شركة' must appear!
     res_ret_co = client.get(f'/?tab=orders&company_id={comp_id}&status=مرتجع شركة')
@@ -986,6 +990,29 @@ def test_returned_company_hidden_by_default_in_orders_log(client):
     html_ret_co = res_ret_co.get_data(as_text=True)
     assert 'RET-CO-999' in html_ret_co
     assert 'ACT-WH-001' not in html_ret_co
+
+    # 3. When explicitly filtering by status='تم التوصيل': 'تم التوصيل' must appear!
+    res_del = client.get(f'/?tab=orders&company_id={comp_id}&status=تم التوصيل')
+    assert res_del.status_code == 200
+    html_del = res_del.get_data(as_text=True)
+    assert 'DEL-999' in html_del
+    assert 'ACT-WH-001' not in html_del
+
+    # 4. When explicitly filtering by status='تسليم جزئي / مرتجع': 'تسليم جزئي / مرتجع' must appear!
+    res_part = client.get(f'/?tab=orders&company_id={comp_id}&status=تسليم جزئي / مرتجع')
+    assert res_part.status_code == 200
+    html_part = res_part.get_data(as_text=True)
+    assert 'PART-999' in html_part
+    assert 'ACT-WH-001' not in html_part
+
+    # 5. When filtering by 'all_inclusive': all orders appear!
+    res_all = client.get(f'/?tab=orders&company_id={comp_id}&status=all_inclusive')
+    assert res_all.status_code == 200
+    html_all = res_all.get_data(as_text=True)
+    assert 'ACT-WH-001' in html_all
+    assert 'RET-CO-999' in html_all
+    assert 'DEL-999' in html_all
+    assert 'PART-999' in html_all
 
 
 

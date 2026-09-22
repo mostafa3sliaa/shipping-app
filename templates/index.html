@@ -54,31 +54,37 @@
 
         <div class="row mb-4">
             <div class="col-md-3 mb-3">
-                <div class="card text-white bg-primary h-100 shadow-sm border-0">
-                    <div class="card-body text-center p-3">
-                        <i class="fa-solid fa-box-open fa-2x mb-2 text-white-50"></i>
-                        <h6 class="card-title fw-bold">مخزن</h6>
-                        <p class="display-6 fw-bold mb-0">{{ new_in_warehouse }}</p>
+                <a href="{{ url_for('index', tab='orders', status='مخزن') }}" class="text-decoration-none">
+                    <div class="card text-white bg-primary h-100 shadow-sm border-0" title="عرض أوردرات مخزن">
+                        <div class="card-body text-center p-3">
+                            <i class="fa-solid fa-box-open fa-2x mb-2 text-white-50"></i>
+                            <h6 class="card-title fw-bold">مخزن</h6>
+                            <p class="display-6 fw-bold mb-0">{{ new_in_warehouse }}</p>
+                        </div>
                     </div>
-                </div>
+                </a>
             </div>
             <div class="col-md-3 mb-3">
-                <div class="card text-dark bg-warning h-100 shadow-sm border-0">
-                    <div class="card-body text-center p-3">
-                        <i class="fa-solid fa-motorcycle fa-2x mb-2 opacity-50"></i>
-                        <h6 class="card-title fw-bold">مع المندوب</h6>
-                        <p class="display-6 fw-bold mb-0">{{ with_courier }}</p>
+                <a href="{{ url_for('index', tab='orders', status='مع المندوب') }}" class="text-decoration-none">
+                    <div class="card text-dark bg-warning h-100 shadow-sm border-0" title="عرض أوردرات مع المندوب">
+                        <div class="card-body text-center p-3">
+                            <i class="fa-solid fa-motorcycle fa-2x mb-2 opacity-50"></i>
+                            <h6 class="card-title fw-bold">مع المندوب</h6>
+                            <p class="display-6 fw-bold mb-0">{{ with_courier }}</p>
+                        </div>
                     </div>
-                </div>
+                </a>
             </div>
             <div class="col-md-3 mb-3">
-                <div class="card text-white bg-danger h-100 shadow-sm border-0">
-                    <div class="card-body text-center p-3">
-                        <i class="fa-solid fa-rotate-left fa-2x mb-2 text-white-50"></i>
-                        <h6 class="card-title fw-bold">مرتجع</h6>
-                        <p class="display-6 fw-bold mb-0">{{ returned }}</p>
+                <a href="{{ url_for('index', tab='orders', status='مرتجع') }}" class="text-decoration-none">
+                    <div class="card text-white bg-danger h-100 shadow-sm border-0" title="عرض أوردرات مرتجع">
+                        <div class="card-body text-center p-3">
+                            <i class="fa-solid fa-rotate-left fa-2x mb-2 text-white-50"></i>
+                            <h6 class="card-title fw-bold">مرتجع</h6>
+                            <p class="display-6 fw-bold mb-0">{{ returned }}</p>
+                        </div>
                     </div>
-                </div>
+                </a>
             </div>
             <div class="col-md-3 mb-3">
                 <a href="{{ url_for('index', tab='orders', status='مرتجع شركة') }}" class="text-decoration-none">
@@ -381,9 +387,10 @@
                     
                     <div class="col-md-2">
                         <select name="status" class="form-select border-primary" onchange="this.form.submit()">
-                            <option value="">-- كل الحالات (بدون مرتجع شركة) --</option>
+                            <option value="">-- كل الحالات الحالية --</option>
                             <option value="none" {% if filter_status == 'none' %}selected{% endif %}>-- بدون حالة --</option>
                             <option value="all_returns" {% if filter_status == 'all_returns' %}selected{% endif %}>-- كل المرتجعات (الجزئي + المرتجع) --</option>
+                            <option value="all_inclusive" {% if filter_status == 'all_inclusive' %}selected{% endif %}>-- كل الحالات بالكامل (شامل المسلم والمرتجع) --</option>
                             {% for status in statuses %}
                             <option value="{{ status }}" {% if filter_status == status %}selected{% endif %}>{{ status }}</option>
                             {% endfor %}
