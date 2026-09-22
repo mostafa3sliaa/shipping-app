@@ -561,95 +561,109 @@ def index():
                            deposit_history=deposit_history,
                            duplicate_phones=duplicate_phones)
 
-@app.route('/export_excel', methods=['GET'])
+@app.route('/export_excel', methods=['GET', 'POST'])
 @login_required
 def export_excel():
-    search_query = request.args.get('search', '').strip()
-    filter_company = request.args.get('company_id') or request.args.get('company', '')
-    filter_status = request.args.get('status', '')
-    filter_courier = request.args.get('courier_id', '')
-    filter_region = request.args.get('region', '')
-    filter_duplicates = request.args.get('duplicates', '')
+    order_ids = request.form.getlist('order_ids') or request.args.getlist('order_ids')
 
     query = Order.query.options(joinedload(Order.company), joinedload(Order.courier))
     
-    if search_query:
-        clean_search = search_query.strip()
-        query = query.filter(or_(
-            Order.tracking_number.ilike(f'%{clean_search}%'),
-            Order.client_name.ilike(f'%{clean_search}%'),
-            Order.phone.ilike(f'%{clean_search}%'),
-            Order.address.ilike(f'%{clean_search}%'),
-            Order.content.ilike(f'%{clean_search}%'),
-            Order.batch_id == clean_search
-        ))
-    if filter_company:
-        if filter_company == 'none':
-            query = query.filter(Order.company_id.is_(None))
-        elif filter_company == 'all':
-            query = query.filter(Order.company_id.isnot(None))
-        else:
-            query = query.filter_by(company_id=filter_company)
-    if filter_status:
-        if filter_status == 'none':
-            query = query.filter(or_(Order.status.is_(None), Order.status == ''))
-        elif filter_status == 'all_returns':
+    if order_ids:
+        query = query.filter(Order.id.in_(order_ids))
+    elif request.method == 'POST' and request.form.get('action') == 'export_excel' and not order_ids:
+        flash('لم يتم تحديد أي أوردر لتصديره للإكسيل!', 'warning')
+        return redirect(url_for('index', tab='orders'))
+    else:
+        search_query = (request.values.get('search') or '').strip()
+        filter_company = request.values.get('company_id') or request.values.get('company', '')
+        filter_status = request.values.get('status', '')
+        filter_courier = request.values.get('courier_id', '')
+        filter_region = request.values.get('region', '')
+        filter_duplicates = request.values.get('duplicates', '')
+
+        if search_query:
+            clean_search = search_query.strip()
             query = query.filter(or_(
-                Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن']),
-                Order.status.ilike('%مرتجع%')
+                Order.tracking_number.ilike(f'%{clean_search}%'),
+                Order.client_name.ilike(f'%{clean_search}%'),
+                Order.phone.ilike(f'%{clean_search}%'),
+                Order.address.ilike(f'%{clean_search}%'),
+                Order.content.ilike(f'%{clean_search}%'),
+                Order.batch_id == clean_search
             ))
-        else:
-            query = query.filter_by(status=filter_status)
-    if filter_courier:
-        if filter_courier == 'none':
-            query = query.filter(Order.courier_id.is_(None))
-        elif filter_courier == 'all':
-            query = query.filter(Order.courier_id.isnot(None))
-        else:
-            query = query.filter_by(courier_id=filter_courier)
-    if filter_region:
-        if filter_region == 'none':
-            query = query.filter(or_(Order.region.is_(None), Order.region == '', Order.region == 'غير محدد'))
-        elif filter_region == 'all':
-            query = query.filter(and_(Order.region.isnot(None), Order.region != '', Order.region != 'غير محدد'))
-        else:
-            query = query.filter_by(region=filter_region)
-    if filter_duplicates == '1':
-        duplicate_phones_query = db.session.query(Order.phone).group_by(Order.phone).having(db.func.count(Order.id) > 1).all()
-        duplicate_phones = set([r[0] for r in duplicate_phones_query if r[0]])
-        if duplicate_phones:
-            query = query.filter(Order.phone.in_(list(duplicate_phones)))
+        if filter_company:
+            if filter_company == 'none':
+                query = query.filter(Order.company_id.is_(None))
+            elif filter_company == 'all':
+                query = query.filter(Order.company_id.isnot(None))
+            else:
+                query = query.filter_by(company_id=filter_company)
+        if filter_status:
+            if filter_status == 'none':
+                query = query.filter(or_(Order.status.is_(None), Order.status == ''))
+            elif filter_status == 'all_returns':
+                query = query.filter(or_(
+                    Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن']),
+                    Order.status.ilike('%مرتجع%')
+                ))
+            else:
+                query = query.filter_by(status=filter_status)
+        if filter_courier:
+            if filter_courier == 'none':
+                query = query.filter(Order.courier_id.is_(None))
+            elif filter_courier == 'all':
+                query = query.filter(Order.courier_id.isnot(None))
+            else:
+                query = query.filter_by(courier_id=filter_courier)
+        if filter_region:
+            if filter_region == 'none':
+                query = query.filter(or_(Order.region.is_(None), Order.region == '', Order.region == 'غير محدد'))
+            elif filter_region == 'all':
+                query = query.filter(and_(Order.region.isnot(None), Order.region != '', Order.region != 'غير محدد'))
+            else:
+                query = query.filter_by(region=filter_region)
+        if filter_duplicates == '1':
+            duplicate_phones_query = db.session.query(Order.phone).group_by(Order.phone).having(db.func.count(Order.id) > 1).all()
+            duplicate_phones = set([r[0] for r in duplicate_phones_query if r[0]])
+            if duplicate_phones:
+                query = query.filter(Order.phone.in_(list(duplicate_phones)))
             
     orders = query.order_by(Order.id.desc()).all()
+    
+    columns = [
+        'رقم البوليصة', 'العميل', 'رقم التليفون', 'المنطقة', 'العنوان',
+        'الشركة', 'المندوب', 'الإجمالي', 'الشحن', 'الصافي',
+        'عمولة المندوب', 'الحالة', 'التاريخ'
+    ]
     
     data = []
     for o in orders:
         # Use collected_amount if present (partial delivery), otherwise cod
-        total_cod = o.collected_amount if o.collected_amount is not None else o.cod
-        shipping = o.shipping_fee or 0
+        total_cod = (o.collected_amount if o.collected_amount is not None else o.cod) or 0.0
+        shipping = o.shipping_fee or 0.0
         net = total_cod - shipping
         
-        status_display = o.status
+        status_display = o.status or ''
         if o.status == 'مع المندوب' and o.courier:
             status_display = f"مع المندوب ({o.courier.name})"
             
         data.append({
-            'رقم البوليصة': o.tracking_number,
-            'العميل': o.client_name,
-            'رقم التليفون': o.phone,
-            'المنطقة': o.region,
-            'العنوان': o.address,
+            'رقم البوليصة': o.tracking_number or '',
+            'العميل': o.client_name or '',
+            'رقم التليفون': o.phone or '',
+            'المنطقة': o.region or '',
+            'العنوان': o.address or '',
             'الشركة': o.company.name if o.company else '',
             'المندوب': o.courier.name if o.courier else '',
             'الإجمالي': total_cod,
             'الشحن': shipping,
             'الصافي': net,
-            'عمولة المندوب': o.courier_fee or 0,
+            'عمولة المندوب': o.courier_fee or 0.0,
             'الحالة': status_display,
             'التاريخ': o.created_at.strftime('%Y-%m-%d') if o.created_at else ''
         })
         
-    df = pd.DataFrame(data)
+    df = pd.DataFrame(data, columns=columns)
     
     if not df.empty:
         totals = {
@@ -1081,6 +1095,9 @@ def bulk_action():
 
     if action == 'print_selected':
         return render_template('print.html', orders=orders_to_update)
+
+    if action == 'export_excel':
+        return export_excel()
 
     updated_details = []
 

@@ -927,6 +927,39 @@ def test_filter_all_returns_and_net_display(client):
     # Net without shipping for o3: 1000 - 70 = 930.00 ج.م
     assert '930.00 ج.م' in html_wh
 
+def test_export_excel_features(client):
+    with app.app_context():
+        comp = Company(name='شركة التصدير')
+        db.session.add(comp)
+        db.session.flush()
+
+        o1 = Order(tracking_number='EXP-001', company_id=comp.id, status='مخزن', cod=500.0, shipping_fee=50.0, client_name='عميل 1', phone='01011111111')
+        o2 = Order(tracking_number='EXP-002', company_id=comp.id, status='مرتجع', cod=300.0, shipping_fee=50.0, client_name='عميل 2', phone='01022222222')
+        o3 = Order(tracking_number='EXP-003', company_id=comp.id, status='تم التوصيل', cod=800.0, shipping_fee=60.0, client_name='عميل 3', phone='01033333333')
+        db.session.add_all([o1, o2, o3])
+        db.session.commit()
+        id1, id2, id3 = o1.id, o2.id, o3.id
+        comp_id = comp.id
+
+    # 1. GET export with filter (status=مخزن)
+    resp_get = client.get(f'/export_excel?company_id={comp_id}&status=مخزن')
+    assert resp_get.status_code == 200
+    assert 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' in resp_get.content_type
+    assert len(resp_get.data) > 1000
+
+    # 2. POST export with order_ids (selected orders)
+    resp_post = client.post('/export_excel', data={'order_ids': [str(id1), str(id3)]})
+    assert resp_post.status_code == 200
+    assert 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' in resp_post.content_type
+    assert len(resp_post.data) > 1000
+
+    # 3. Bulk action export_excel
+    resp_bulk = client.post('/orders/bulk_action', data={'action': 'export_excel', 'order_ids': [str(id2)]})
+    assert resp_bulk.status_code == 200
+    assert 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' in resp_bulk.content_type
+    assert len(resp_bulk.data) > 1000
+
+
 
 
 
