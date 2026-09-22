@@ -1326,6 +1326,8 @@
                 updateSelectAllState();
             }
         });
+    }
+
     // Export filtered orders to Excel cleanly bypassing Turbo
     function exportOrdersExcel() {
         const form = document.getElementById('ordersFilterForm');
@@ -1340,6 +1342,7 @@
         const queryString = params.toString();
         window.location.href = "{{ url_for('export_excel') }}" + (queryString ? '?' + queryString : '');
     }
+    window.exportOrdersExcel = exportOrdersExcel;
 
     // Single Delete Order JS
     function deleteSingleOrder(orderId) {
