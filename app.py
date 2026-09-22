@@ -24,7 +24,10 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///shipping.db'
 
 if db_url:
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'poolclass': NullPool,
+        'pool_pre_ping': True,
+        'pool_recycle': 300,
+        'pool_size': 5,
+        'max_overflow': 10,
         'connect_args': {
             'connect_timeout': 10
         }
@@ -282,60 +285,66 @@ def get_company_profit_data():
 @login_required
 def index():
     # Active tab and scan state
-    active_tab = request.args.get('tab', 'dashboard')
     scanned_tracking = request.args.get('scanned', None)
+    search_query = request.args.get('search', '').strip()
+    filter_company = request.args.get('company_id') or request.args.get('company', '')
+    filter_status = request.args.get('status', '')
+    filter_courier = request.args.get('courier_id', '')
+    filter_region = request.args.get('region', '')
+    filter_duplicates = request.args.get('duplicates', '')
     
-    # 1. Fetch all Status counts, goods sums in ONE combined query
-    metrics = db.session.query(
-        Order.status,
-        db.func.count(Order.id),
-        db.func.sum(Order.cod),
-        db.func.sum(Order.shipping_fee),
-        db.func.sum(Order.collected_amount)
-    ).group_by(Order.status).all()
-    
-    status_dict = {}
-    total_orders = 0
-    full_goods = 0.0
-    partial_goods = 0.0
-    
-    for st, count, cod_sum, shipping_sum, collected_sum in metrics:
-        cnt = count or 0
-        cod_s = cod_sum or 0.0
-        ship_s = shipping_sum or 0.0
-        coll_s = collected_sum or 0.0
-        
-        status_dict[st] = cnt
-        total_orders += cnt
-        
-        if st not in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع شركة']:
-            full_goods += (cod_s - ship_s)
-        if st == 'تسليم جزئي / مرتجع':
-            partial_goods += (cod_s - coll_s)
-            
-    # Calculate collected profit strictly from settled orders (courier_settled == True)
-    company_profit, profit_total_earned, profit_total_resets, profit_orders = get_company_profit_data()
+    req_tab = request.args.get('tab', 'dashboard')
+    if search_query or filter_company or filter_status or filter_courier or filter_region or filter_duplicates or scanned_tracking:
+        active_tab = 'orders'
+    else:
+        active_tab = req_tab
 
-    total_goods = full_goods + partial_goods
-    new_in_warehouse = status_dict.get('مخزن', 0)
-    postponed = status_dict.get('مؤجل', 0)
-    returned = status_dict.get('مرتجع', 0)
-    returned_company = status_dict.get('مرتجع شركة', 0)
-    with_courier = status_dict.get('مع المندوب', 0)
-    
-    # 2. Fetch Treasury sums in ONE query
-    treasury_sums = db.session.query(TreasuryTransaction.method, db.func.sum(TreasuryTransaction.amount)).group_by(TreasuryTransaction.method).all()
-    treasury_dict = dict(treasury_sums)
-    treasury_cash = treasury_dict.get('كاش', 0.0)
-    treasury_transfer = treasury_dict.get('تحويل', 0.0)
-    
-    # 3. Total Capital (خزينة كاش + محفظة تحويل + بضاعة قائمة)
-    total_capital = treasury_cash + treasury_transfer + total_goods
-    
-    active_couriers = Courier.query.count()
-    
-    # Advanced Dashboard Stats (Only computed if viewing dashboard tab)
+    # 1. Fetch dashboard stats ONLY if viewing dashboard tab
     if active_tab == 'dashboard':
+        metrics = db.session.query(
+            Order.status,
+            db.func.count(Order.id),
+            db.func.sum(Order.cod),
+            db.func.sum(Order.shipping_fee),
+            db.func.sum(Order.collected_amount)
+        ).group_by(Order.status).all()
+        
+        status_dict = {}
+        total_orders = 0
+        full_goods = 0.0
+        partial_goods = 0.0
+        
+        for st, count, cod_sum, shipping_sum, collected_sum in metrics:
+            cnt = count or 0
+            cod_s = cod_sum or 0.0
+            ship_s = shipping_sum or 0.0
+            coll_s = collected_sum or 0.0
+            
+            status_dict[st] = cnt
+            total_orders += cnt
+            
+            if st not in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع شركة']:
+                full_goods += (cod_s - ship_s)
+            if st == 'تسليم جزئي / مرتجع':
+                partial_goods += (cod_s - coll_s)
+                
+        company_profit, profit_total_earned, profit_total_resets, profit_orders = get_company_profit_data()
+
+        total_goods = full_goods + partial_goods
+        new_in_warehouse = status_dict.get('مخزن', 0)
+        postponed = status_dict.get('مؤجل', 0)
+        returned = status_dict.get('مرتجع', 0)
+        returned_company = status_dict.get('مرتجع شركة', 0)
+        with_courier = status_dict.get('مع المندوب', 0)
+        
+        treasury_sums = db.session.query(TreasuryTransaction.method, db.func.sum(TreasuryTransaction.amount)).group_by(TreasuryTransaction.method).all()
+        treasury_dict = dict(treasury_sums)
+        treasury_cash = treasury_dict.get('كاش', 0.0)
+        treasury_transfer = treasury_dict.get('تحويل', 0.0)
+        total_capital = treasury_cash + treasury_transfer + total_goods
+        
+        active_couriers = Courier.query.count()
+        
         region_stats = db.session.query(
             Order.region,
             db.func.count(Order.id).label('count'),
@@ -347,18 +356,32 @@ def index():
             db.func.count(Order.id).label('count'),
             db.func.sum(Order.cod - Order.shipping_fee).label('net')
         ).join(Order).group_by(Company.name).all()
+        
+        deposit_history = TreasuryTransaction.query.filter(
+            TreasuryTransaction.tx_type.in_(['إيداع_يدوي', 'مصروفات', 'سحب_محفظة', 'تصفير_أرباح'])
+        ).order_by(TreasuryTransaction.created_at.desc()).limit(50).all()
     else:
+        total_orders = 0
+        total_goods = 0.0
+        total_capital = 0.0
+        treasury_cash = 0.0
+        treasury_transfer = 0.0
+        company_profit = 0.0
+        profit_orders = []
+        profit_total_earned = 0.0
+        profit_total_resets = 0.0
+        active_couriers = 0
+        new_in_warehouse = 0
+        postponed = 0
+        returned = 0
+        returned_company = 0
+        with_courier = 0
+        partial_goods = 0.0
         region_stats = []
         company_stats = []
-    
-    # Orders & Search & Filters
-    search_query = request.args.get('search', '').strip()
-    filter_company = request.args.get('company_id') or request.args.get('company', '')
-    filter_status = request.args.get('status', '')
-    filter_courier = request.args.get('courier_id', '')
-    filter_region = request.args.get('region', '')
-    filter_duplicates = request.args.get('duplicates', '')
+        deposit_history = []
 
+    # Orders & Search & Filters
     query = Order.query.options(joinedload(Order.company), joinedload(Order.courier))
     
     # Duplicate phone filtering: only run full table scan if explicitly requested
@@ -423,7 +446,7 @@ def index():
         else:
             query = query.filter_by(region=filter_region)
         
-    # Get aggregates efficiently from DB instead of Python loop
+    # Get aggregates efficiently from DB in 1 single fast query
     net_expr = db.case(
         (Order.status == 'تسليم جزئي / مرتجع', db.func.coalesce(Order.collected_amount, Order.cod) - db.func.coalesce(Order.shipping_fee, 0.0)),
         else_=db.func.coalesce(Order.cod, 0.0) - db.func.coalesce(Order.shipping_fee, 0.0)
@@ -440,65 +463,31 @@ def index():
     filtered_shipping = agg[2] or 0.0
     filtered_net = agg[3] or 0.0
     
-    # Pagination (fast initial page load of 30, subsequent pages load automatically on scroll)
+    # Pagination: default 500 orders so full company lists load instantly and select all works across all 200+ orders
+    per_page = request.args.get('per_page', 500, type=int)
     page = request.args.get('page', 1, type=int)
-    pagination = query.order_by(Order.id.desc()).paginate(page=page, per_page=30, error_out=False)
+    pagination = query.order_by(Order.id.desc()).paginate(page=page, per_page=per_page, error_out=False, count=False)
+    pagination.total = filtered_orders_count
     all_orders = pagination.items
     
-    # Check duplicate phones ONLY for the current page items to highlight them in UI
+    # Check duplicate phones ONLY in memory for current page orders (0 database queries)
+    from collections import Counter
     if filter_duplicates != '1' and all_orders:
-        page_phones = [o.phone for o in all_orders if o.phone]
-        if page_phones:
-            dup_q = db.session.query(Order.phone).filter(Order.phone.in_(page_phones)).group_by(Order.phone).having(db.func.count(Order.id) > 1).all()
-            duplicate_phones = set([r[0] for r in dup_q if r[0]])
+        phone_counts = Counter(o.phone for o in all_orders if o.phone)
+        duplicate_phones = {p for p, c in phone_counts.items() if c > 1}
+    elif filter_duplicates != '1':
+        duplicate_phones = set()
 
-    if search_query or filter_company or filter_status or filter_courier or filter_region:
-        active_tab = 'orders' # Force orders tab if filtering
-        
-    # Couriers & Companies for Modals (fast query without joining all orders)
+    # Couriers & Companies for Modals
     couriers = Courier.query.order_by(Courier.name).all()
     companies = Company.query.order_by(Company.name).all()
     
-    # All canonical statuses for modals and forms
+    # Canonical statuses for modals and forms
     all_statuses = ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع', 'مرتجع شركة', 'مؤجل']
+    statuses = all_statuses
     
-    # Active statuses in DB for filters
-    db_statuses = [r[0] for r in db.session.query(Order.status).distinct().all()]
-    statuses = [s for s in all_statuses if s in db_statuses]
-    
-    # Active regions in DB based on current filters (fast query without joinedload)
-    region_query = Order.query
-    if search_query:
-        region_query = region_query.filter(or_(
-            Order.tracking_number.contains(search_query),
-            Order.client_name.contains(search_query),
-            Order.phone.contains(search_query),
-            Order.batch_id == search_query
-        ))
-    if filter_company:
-        if filter_company == 'none':
-            region_query = region_query.filter(Order.company_id.is_(None))
-        else:
-            region_query = region_query.filter_by(company_id=filter_company)
-            
-    if filter_status:
-        if filter_status == 'none':
-            region_query = region_query.filter(or_(Order.status.is_(None), Order.status == ''))
-        elif filter_status == 'all_returns':
-            region_query = region_query.filter(Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']))
-        else:
-            region_query = region_query.filter_by(status=filter_status)
-    else:
-        if not search_query:
-            region_query = region_query.filter(or_(Order.status != 'مرتجع شركة', Order.status.is_(None)))
-            
-    if filter_courier:
-        if filter_courier == 'none':
-            region_query = region_query.filter(Order.courier_id.is_(None))
-        else:
-            region_query = region_query.filter_by(courier_id=filter_courier)
-    
-    regions = [r[0] for r in region_query.with_entities(Order.region).distinct().all() if r[0]]
+    # Active regions in DB
+    regions = [r[0] for r in db.session.query(Order.region).filter(and_(Order.region.isnot(None), Order.region != '', Order.region != 'غير محدد')).distinct().all()]
     
     # Scanned order logic
     scanned_orders = []
@@ -511,14 +500,6 @@ def index():
         
         if not scanned_orders:
             flash('لا يوجد أوردر مطابق للبحث!', 'danger')
-            
-    # Fetch manual treasury transaction history (only for dashboard)
-    if active_tab == 'dashboard':
-        deposit_history = TreasuryTransaction.query.filter(
-            TreasuryTransaction.tx_type.in_(['إيداع_يدوي', 'مصروفات', 'سحب_محفظة', 'تصفير_أرباح'])
-        ).order_by(TreasuryTransaction.created_at.desc()).limit(50).all()
-    else:
-        deposit_history = []
     
     return render_template('index.html', 
                            total_orders=total_orders, 

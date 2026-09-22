@@ -416,6 +416,7 @@
                     <div class="form-check d-inline-flex align-items-center me-3 m-0">
                         <input class="form-check-input border-secondary" type="checkbox" id="selectAll" onchange="toggleAllOrders(this)" style="cursor: pointer; width: 1.2em; height: 1.2em;">
                         <label class="form-check-label fw-bold user-select-none ms-1" for="selectAll" style="cursor: pointer;">تحديد الكل</label>
+                        <span id="selectedCountBadge" class="badge bg-primary ms-2 shadow-sm" style="display: none; font-size: 0.85rem;">0 محدد</span>
                     </div>
                 </div>
                 <div class="d-flex gap-2 flex-wrap">
@@ -588,7 +589,7 @@
                     </div>
                     
                     {% if pagination and pagination.has_next %}
-                    <div id="infinite-scroll-trigger" data-next-url="{{ url_for('index', page=pagination.next_num, tab='orders', search=search_query, company=filter_company, status=filter_status, courier_id=filter_courier, region=filter_region) }}" class="text-center py-4 text-muted fw-bold">
+                    <div id="infinite-scroll-trigger" data-next-url="{{ url_for('index', page=pagination.next_num, tab='orders', search=search_query, company_id=filter_company, status=filter_status, courier_id=filter_courier, region=filter_region, per_page=500) }}" class="text-center py-4 text-muted fw-bold">
                         <i class="fa-solid fa-spinner fa-spin me-2"></i> جاري تحميل المزيد...
                     </div>
                     {% endif %}
@@ -1286,6 +1287,19 @@
         });
     }
 
+    function updateSelectedCount() {
+        const count = document.querySelectorAll('.order-checkbox:checked').length;
+        const badge = document.getElementById('selectedCountBadge');
+        if (badge) {
+            if (count > 0) {
+                badge.innerText = `تم تحديد ${count} أوردر`;
+                badge.style.display = 'inline-block';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+    }
+
     // Select all checkboxes logic
     function toggleAllOrders(master) {
         if (!master) return;
@@ -1298,6 +1312,7 @@
         for (var j = 0; j < masters.length; j++) {
             masters[j].checked = isChecked;
         }
+        updateSelectedCount();
     }
 
     function updateSelectAllState() {
@@ -1314,10 +1329,12 @@
         for (var j = 0; j < masters.length; j++) {
             masters[j].checked = allChecked;
         }
+        updateSelectedCount();
     }
 
     window.toggleAllOrders = toggleAllOrders;
     window.updateSelectAllState = updateSelectAllState;
+    window.updateSelectedCount = updateSelectedCount;
 
     if (!window._selectAllListenerAttached) {
         window._selectAllListenerAttached = true;
@@ -1864,58 +1881,101 @@
 
 <script>
 (function() {
+    let isLoadingMore = false;
+
+    function fetchNextBatch(trigger) {
+        if (isLoadingMore || !trigger) return;
+        const nextUrl = trigger.getAttribute('data-next-url');
+        if (!nextUrl) return;
+
+        isLoadingMore = true;
+        trigger.removeAttribute('data-next-url'); // Prevent duplicate requests
+        trigger.style.display = 'block';
+
+        fetch(nextUrl, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // Append new rows to tbody
+            const newRows = doc.querySelectorAll('#orders-tbody tr');
+            const tbody = document.getElementById('orders-tbody');
+            if (tbody && newRows.length > 0) {
+                const master = document.getElementById('selectAll');
+                const isMasterChecked = master && master.checked;
+                newRows.forEach(row => {
+                    if (isMasterChecked) {
+                        const cb = row.querySelector('.order-checkbox');
+                        if (cb) cb.checked = true;
+                    }
+                    tbody.appendChild(row);
+                });
+                if (typeof window.updateSelectedCount === 'function') {
+                    window.updateSelectedCount();
+                }
+            }
+            
+            // Update or remove trigger
+            const newTrigger = doc.getElementById('infinite-scroll-trigger');
+            if (newTrigger && newTrigger.getAttribute('data-next-url')) {
+                trigger.setAttribute('data-next-url', newTrigger.getAttribute('data-next-url'));
+            } else {
+                trigger.style.display = 'none';
+            }
+            isLoadingMore = false;
+        })
+        .catch(err => {
+            console.error("Error loading more orders:", err);
+            isLoadingMore = false;
+        });
+    }
+
     function initInfiniteScroll() {
         const trigger = document.getElementById('infinite-scroll-trigger');
         if (!trigger || trigger.dataset.observerAttached) return;
         
         trigger.dataset.observerAttached = 'true';
 
+        // 1. IntersectionObserver with generous 1200px prefetch
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
-                    const nextUrl = trigger.getAttribute('data-next-url');
-                    if (nextUrl) {
-                        trigger.removeAttribute('data-next-url'); // Prevent duplicate requests
-                        
-                        fetch(nextUrl, {
-                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                        })
-                        .then(response => response.text())
-                        .then(html => {
-                            const parser = new DOMParser();
-                            const doc = parser.parseFromString(html, 'text/html');
-                            
-                            // Append new rows to tbody
-                            const newRows = doc.querySelectorAll('#orders-tbody tr');
-                            const tbody = document.getElementById('orders-tbody');
-                            if (tbody && newRows.length > 0) {
-                                const master = document.getElementById('selectAll');
-                                const isMasterChecked = master && master.checked;
-                                newRows.forEach(row => {
-                                    if (isMasterChecked) {
-                                        const cb = row.querySelector('.order-checkbox');
-                                        if (cb) cb.checked = true;
-                                    }
-                                    tbody.appendChild(row);
-                                });
-                            }
-                            
-                            // Update or remove trigger
-                            const newTrigger = doc.getElementById('infinite-scroll-trigger');
-                            if (newTrigger && newTrigger.getAttribute('data-next-url')) {
-                                trigger.setAttribute('data-next-url', newTrigger.getAttribute('data-next-url'));
-                            } else {
-                                trigger.style.display = 'none';
-                                observer.disconnect();
-                            }
-                        })
-                        .catch(err => console.error("Error loading more orders:", err));
-                    }
+                    fetchNextBatch(trigger);
                 }
             });
-        }, { rootMargin: '300px' }); // Trigger load 300px before reaching the end
+        }, { rootMargin: '1200px' });
 
         observer.observe(trigger);
+
+        // 2. Early scroll trigger at 50% scroll on table container
+        const tableContainer = document.querySelector('.table-responsive');
+        if (tableContainer && !tableContainer.dataset.scrollAttached) {
+            tableContainer.dataset.scrollAttached = 'true';
+            tableContainer.addEventListener('scroll', function() {
+                if (tableContainer.scrollTop + tableContainer.clientHeight >= tableContainer.scrollHeight * 0.5) {
+                    fetchNextBatch(trigger);
+                }
+            }, { passive: true });
+        }
+
+        // 3. Early scroll trigger at 50% scroll on window
+        if (!window._earlyWindowScrollAttached) {
+            window._earlyWindowScrollAttached = true;
+            window.addEventListener('scroll', function() {
+                const scrollY = window.scrollY || window.pageYOffset;
+                const windowHeight = window.innerHeight;
+                const docHeight = document.documentElement.scrollHeight;
+                if (scrollY + windowHeight >= docHeight * 0.5) {
+                    const currentTrigger = document.getElementById('infinite-scroll-trigger');
+                    if (currentTrigger) {
+                        fetchNextBatch(currentTrigger);
+                    }
+                }
+            }, { passive: true });
+        }
     }
     
     // Run on standard load
