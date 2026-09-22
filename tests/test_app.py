@@ -959,6 +959,33 @@ def test_export_excel_features(client):
     assert 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' in resp_bulk.content_type
     assert len(resp_bulk.data) > 1000
 
+def test_returned_company_hidden_by_default_in_orders_log(client):
+    with app.app_context():
+        comp = Company(name='شركة المرتجعات المستبعدة')
+        db.session.add(comp)
+        db.session.flush()
+
+        active_ord = Order(tracking_number='ACT-WH-001', company_id=comp.id, status='مخزن', cod=400.0, shipping_fee=50.0)
+        returned_co_ord = Order(tracking_number='RET-CO-999', company_id=comp.id, status='مرتجع شركة', cod=700.0, shipping_fee=60.0)
+        db.session.add_all([active_ord, returned_co_ord])
+        db.session.commit()
+        comp_id = comp.id
+
+    # 1. Default orders log for this company (filter_status is empty): 'مرتجع شركة' must be hidden!
+    res_default = client.get(f'/?tab=orders&company_id={comp_id}')
+    assert res_default.status_code == 200
+    html_default = res_default.get_data(as_text=True)
+    assert 'ACT-WH-001' in html_default
+    assert 'RET-CO-999' not in html_default
+
+    # 2. When explicitly filtering by status='مرتجع شركة': 'مرتجع شركة' must appear!
+    res_ret_co = client.get(f'/?tab=orders&company_id={comp_id}&status=مرتجع شركة')
+    assert res_ret_co.status_code == 200
+    html_ret_co = res_ret_co.get_data(as_text=True)
+    assert 'RET-CO-999' in html_ret_co
+    assert 'ACT-WH-001' not in html_ret_co
+
+
 
 
 

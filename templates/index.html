@@ -81,13 +81,15 @@
                 </div>
             </div>
             <div class="col-md-3 mb-3">
-                <div class="card text-white bg-dark h-100 shadow-sm border-0">
-                    <div class="card-body text-center p-3">
-                        <i class="fa-solid fa-building-circle-arrow-right fa-2x mb-2 text-white-50"></i>
-                        <h6 class="card-title fw-bold">مرتجع شركة</h6>
-                        <p class="display-6 fw-bold mb-0">{{ returned_company }}</p>
+                <a href="{{ url_for('index', tab='orders', status='مرتجع شركة') }}" class="text-decoration-none">
+                    <div class="card text-white bg-dark h-100 shadow-sm border-0" title="عرض أوردرات مرتجع شركة">
+                        <div class="card-body text-center p-3">
+                            <i class="fa-solid fa-building-circle-arrow-right fa-2x mb-2 text-white-50"></i>
+                            <h6 class="card-title fw-bold">مرتجع شركة</h6>
+                            <p class="display-6 fw-bold mb-0">{{ returned_company }}</p>
+                        </div>
                     </div>
-                </div>
+                </a>
             </div>
         </div>
 
@@ -379,7 +381,7 @@
                     
                     <div class="col-md-2">
                         <select name="status" class="form-select border-primary" onchange="this.form.submit()">
-                            <option value="">-- كل الحالات --</option>
+                            <option value="">-- كل الحالات (بدون مرتجع شركة) --</option>
                             <option value="none" {% if filter_status == 'none' %}selected{% endif %}>-- بدون حالة --</option>
                             <option value="all_returns" {% if filter_status == 'all_returns' %}selected{% endif %}>-- كل المرتجعات (الجزئي + المرتجع) --</option>
                             {% for status in statuses %}

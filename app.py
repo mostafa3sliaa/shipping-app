@@ -406,6 +406,9 @@ def index():
             ))
         else:
             query = query.filter_by(status=filter_status)
+    else:
+        if not search_query:
+            query = query.filter(or_(Order.status != 'مرتجع شركة', Order.status.is_(None)))
         
     if filter_courier:
         if filter_courier == 'none':
@@ -491,6 +494,9 @@ def index():
             ))
         else:
             region_query = region_query.filter_by(status=filter_status)
+    else:
+        if not search_query:
+            region_query = region_query.filter(or_(Order.status != 'مرتجع شركة', Order.status.is_(None)))
             
     if filter_courier:
         if filter_courier == 'none':
@@ -608,6 +614,9 @@ def export_excel():
                 ))
             else:
                 query = query.filter_by(status=filter_status)
+        else:
+            if not search_query:
+                query = query.filter(or_(Order.status != 'مرتجع شركة', Order.status.is_(None)))
         if filter_courier:
             if filter_courier == 'none':
                 query = query.filter(Order.courier_id.is_(None))
