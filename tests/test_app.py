@@ -881,6 +881,53 @@ def test_order_settlement_edit_from_profit_modal(client):
     r2 = client.get('/')
     assert '0.00 ج.م' in r2.get_data(as_text=True)
 
+def test_filter_all_returns_and_net_display(client):
+    """
+    Test filtering by status='all_returns' and verifying 'بدون الشحن' display:
+    - Order 1: 'مرتجع', cod=370, ship=70 -> net=300
+    - Order 2: 'تسليم جزئي / مرتجع', cod=500, ship=70, collected=270 -> net=200
+    - Order 3: 'مخزن', cod=1000, ship=70 -> net=930
+    - Order 4: 'تم التوصيل', cod=400, ship=70 -> net=330
+    """
+    with app.app_context():
+        comp = Company(name="Test Ret Co")
+        db.session.add(comp)
+        db.session.commit()
+
+        o1 = Order(tracking_number='RET-FULL-1', company_id=comp.id, status='مرتجع', cod=370.0, shipping_fee=70.0)
+        o2 = Order(tracking_number='RET-PARTIAL-1', company_id=comp.id, status='تسليم جزئي / مرتجع', cod=500.0, shipping_fee=70.0, collected_amount=270.0)
+        o3 = Order(tracking_number='WH-ORD-1', company_id=comp.id, status='مخزن', cod=1000.0, shipping_fee=70.0)
+        o4 = Order(tracking_number='DELIV-ORD-1', company_id=comp.id, status='تم التوصيل', cod=400.0, shipping_fee=70.0)
+        db.session.add_all([o1, o2, o3, o4])
+        db.session.commit()
+
+    # 1. Filter by all_returns
+    resp = client.get('/?tab=orders&status=all_returns')
+    assert resp.status_code == 200
+    html = resp.get_data(as_text=True)
+
+    # Should contain o1 and o2
+    assert 'RET-FULL-1' in html
+    assert 'RET-PARTIAL-1' in html
+    # Should NOT contain o3 and o4
+    assert 'WH-ORD-1' not in html
+    assert 'DELIV-ORD-1' not in html
+
+    # Total orders count for all_returns: 2
+    # Net without shipping: o1 (300) + o2 (200) = 500.00 ج.م
+    assert 'بدون الشحن:' in html
+    assert '500.00 ج.م' in html
+
+    # 2. Filter by warehouse (status=مخزن)
+    resp_wh = client.get('/?tab=orders&status=مخزن')
+    assert resp_wh.status_code == 200
+    html_wh = resp_wh.get_data(as_text=True)
+    assert 'WH-ORD-1' in html_wh
+    assert 'RET-FULL-1' not in html_wh
+    # Net without shipping for o3: 1000 - 70 = 930.00 ج.م
+    assert '930.00 ج.م' in html_wh
+
+
 
 
 

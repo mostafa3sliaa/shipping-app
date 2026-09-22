@@ -399,6 +399,11 @@ def index():
     if filter_status:
         if filter_status == 'none':
             query = query.filter(or_(Order.status.is_(None), Order.status == ''))
+        elif filter_status == 'all_returns':
+            query = query.filter(or_(
+                Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن']),
+                Order.status.ilike('%مرتجع%')
+            ))
         else:
             query = query.filter_by(status=filter_status)
         
@@ -419,16 +424,21 @@ def index():
             query = query.filter_by(region=filter_region)
         
     # Get aggregates efficiently from DB instead of Python loop
+    net_expr = db.case(
+        (Order.status == 'تسليم جزئي / مرتجع', db.func.coalesce(Order.collected_amount, Order.cod) - db.func.coalesce(Order.shipping_fee, 0.0)),
+        else_=db.func.coalesce(Order.cod, 0.0) - db.func.coalesce(Order.shipping_fee, 0.0)
+    )
     agg = query.with_entities(
         db.func.count(Order.id),
         db.func.sum(Order.cod),
-        db.func.sum(Order.shipping_fee)
+        db.func.sum(Order.shipping_fee),
+        db.func.sum(net_expr)
     ).first()
     
     filtered_orders_count = agg[0] or 0
     filtered_cod = agg[1] or 0.0
     filtered_shipping = agg[2] or 0.0
-    filtered_net = filtered_cod - filtered_shipping
+    filtered_net = agg[3] or 0.0
     
     # Pagination (fast initial page load of 30, subsequent pages load automatically on scroll)
     page = request.args.get('page', 1, type=int)
@@ -474,6 +484,11 @@ def index():
     if filter_status:
         if filter_status == 'none':
             region_query = region_query.filter(or_(Order.status.is_(None), Order.status == ''))
+        elif filter_status == 'all_returns':
+            region_query = region_query.filter(or_(
+                Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن']),
+                Order.status.ilike('%مرتجع%')
+            ))
         else:
             region_query = region_query.filter_by(status=filter_status)
             
@@ -578,6 +593,11 @@ def export_excel():
     if filter_status:
         if filter_status == 'none':
             query = query.filter(or_(Order.status.is_(None), Order.status == ''))
+        elif filter_status == 'all_returns':
+            query = query.filter(or_(
+                Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن']),
+                Order.status.ilike('%مرتجع%')
+            ))
         else:
             query = query.filter_by(status=filter_status)
     if filter_courier:
