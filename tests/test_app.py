@@ -898,7 +898,8 @@ def test_filter_all_returns_and_net_display(client):
         o2 = Order(tracking_number='RET-PARTIAL-1', company_id=comp.id, status='تسليم جزئي / مرتجع', cod=500.0, shipping_fee=70.0, collected_amount=270.0)
         o3 = Order(tracking_number='WH-ORD-1', company_id=comp.id, status='مخزن', cod=1000.0, shipping_fee=70.0)
         o4 = Order(tracking_number='DELIV-ORD-1', company_id=comp.id, status='تم التوصيل', cod=400.0, shipping_fee=70.0)
-        db.session.add_all([o1, o2, o3, o4])
+        o5 = Order(tracking_number='RET-COMPANY-1', company_id=comp.id, status='مرتجع شركة', cod=600.0, shipping_fee=50.0)
+        db.session.add_all([o1, o2, o3, o4, o5])
         db.session.commit()
 
     # 1. Filter by all_returns
@@ -909,9 +910,10 @@ def test_filter_all_returns_and_net_display(client):
     # Should contain o1 and o2
     assert 'RET-FULL-1' in html
     assert 'RET-PARTIAL-1' in html
-    # Should NOT contain o3 and o4
+    # Should NOT contain o3, o4, or o5 (مرتجع شركة)
     assert 'WH-ORD-1' not in html
     assert 'DELIV-ORD-1' not in html
+    assert 'RET-COMPANY-1' not in html
 
     # Total orders count for all_returns: 2
     # Net without shipping: o1 (300) + o2 (200) = 500.00 ج.م

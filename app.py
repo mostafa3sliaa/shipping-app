@@ -400,10 +400,7 @@ def index():
         if filter_status == 'none':
             query = query.filter(or_(Order.status.is_(None), Order.status == ''))
         elif filter_status == 'all_returns':
-            query = query.filter(or_(
-                Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن']),
-                Order.status.ilike('%مرتجع%')
-            ))
+            query = query.filter(Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']))
         else:
             query = query.filter_by(status=filter_status)
     else:
@@ -488,10 +485,7 @@ def index():
         if filter_status == 'none':
             region_query = region_query.filter(or_(Order.status.is_(None), Order.status == ''))
         elif filter_status == 'all_returns':
-            region_query = region_query.filter(or_(
-                Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن']),
-                Order.status.ilike('%مرتجع%')
-            ))
+            region_query = region_query.filter(Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']))
         else:
             region_query = region_query.filter_by(status=filter_status)
     else:
@@ -608,10 +602,7 @@ def export_excel():
             if filter_status == 'none':
                 query = query.filter(or_(Order.status.is_(None), Order.status == ''))
             elif filter_status == 'all_returns':
-                query = query.filter(or_(
-                    Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع شركة', 'مرتجع بشحن']),
-                    Order.status.ilike('%مرتجع%')
-                ))
+                query = query.filter(Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']))
             else:
                 query = query.filter_by(status=filter_status)
         else:
