@@ -99,7 +99,7 @@
                                     <td>{{ order.client_name }}</td>
                                     <td class="fw-bold" id="cod_{{ order.id }}" data-val="{{ order.cod }}">{{ order.cod }}</td>
                                     <td>
-                                        <select name="status_{{ order.id }}" id="status_{{ order.id }}" class="form-select form-select-sm fw-bold status-select" onchange="updateRow('{{ order.id }}')">
+                                        <select name="status_{{ order.id }}" id="status_{{ order.id }}" class="form-select form-select-sm fw-bold status-select" onchange="updateRow('{{ order.id }}', true)">
                                             <option value="مع المندوب">لم يُسلم بعد (مع المندوب)</option>
                                             <option value="تم التوصيل" {% if order.status in ['تم التوصيل', 'مع المندوب'] %}selected{% endif %}>تم التوصيل</option>
                                             <option value="تسليم جزئي / مرتجع" {% if order.status == 'تسليم جزئي / مرتجع' %}selected{% endif %}>تسليم جزئي / مرتجع</option>
@@ -112,7 +112,7 @@
                                     </td>
                                     <td>
                                         <div class="input-group input-group-sm">
-                                            <input type="number" step="0.01" name="collected_{{ order.id }}" id="collected_{{ order.id }}" class="form-control text-success fw-bold" value="{{ order.collected_amount if order.collected_amount is not none else '0' }}" oninput="updateRow('{{ order.id }}', true)" readonly>
+                                            <input type="number" step="0.01" name="collected_{{ order.id }}" id="collected_{{ order.id }}" class="form-control text-success fw-bold" value="{{ order.collected_amount if order.collected_amount is not none else '0' }}" oninput="updateTotals()">
                                         </div>
                                     </td>
                                     <td>
@@ -193,7 +193,7 @@
                         }
                     }
 
-                    function updateRow(id, manualCollected = false) {
+                    function updateRow(id, statusChanged = false) {
                         const status = document.getElementById('status_' + id).value;
                         const cod = parseFloat(document.getElementById('cod_' + id).dataset.val);
                         const collectedInput = document.getElementById('collected_' + id);
@@ -209,13 +209,13 @@
                             row.classList.remove('table-success', 'table-warning', 'table-danger', 'table-info');
                             row.classList.add('bg-light');
                         } else if (status === 'تم التوصيل') {
-                            if (!manualCollected && (collectedInput.value == "0" || collectedInput.value == "")) collectedInput.value = cod;
+                            if (statusChanged && (collectedInput.value == "0" || collectedInput.value == "")) collectedInput.value = cod;
                             collectedInput.readOnly = false;
                             feeInput.readOnly = false;
                             row.classList.remove('bg-light', 'table-warning', 'table-danger', 'table-info');
                             row.classList.add('table-success');
                         } else if (status === 'تسليم جزئي / مرتجع') {
-                            if (!manualCollected && (collectedInput.value == "0" || collectedInput.value == "")) collectedInput.value = cod;
+                            if (statusChanged && (collectedInput.value == "0" || collectedInput.value == "")) collectedInput.value = cod;
                             collectedInput.readOnly = false;
                             feeInput.readOnly = false;
                             row.classList.remove('bg-light', 'table-success', 'table-danger', 'table-info');
@@ -234,8 +234,7 @@
                             row.classList.remove('bg-light', 'table-success', 'table-warning', 'table-info');
                             row.classList.add('table-danger');
                         } else if (status === 'مرتجع بشحن') {
-                            const curVal = parseFloat(collectedInput.value) || 0;
-                            if (!manualCollected || curVal === cod || curVal === 0 || collectedInput.value === "") {
+                            if (statusChanged || collectedInput.value == cod || collectedInput.value == "0" || collectedInput.value == "") {
                                 collectedInput.value = (shipping > 0) ? shipping : 70;
                             }
                             collectedInput.readOnly = false;

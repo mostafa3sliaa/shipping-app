@@ -1858,6 +1858,9 @@ def courier_accounting():
                         if final_cash > 0:
                             tx2 = TreasuryTransaction(amount=final_cash, method='كاش', tx_type='تحصيل_من_مندوب', entity_id=selected_courier.id, notes=f'تقفيل شيت مندوب ({settled_count} أوردر)')
                             db.session.add(tx2)
+                        elif final_cash < 0:
+                            tx2 = TreasuryTransaction(amount=final_cash, method='كاش', tx_type='صرف_لمندوب', entity_id=selected_courier.id, notes=f'صرف للمندوب عند تقفيل الشيت ({settled_count} أوردر)')
+                            db.session.add(tx2)
                             
                         db.session.commit()
                         

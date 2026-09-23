@@ -1132,6 +1132,50 @@ def test_orders_summary_card_with_shipping_and_return_reset(client):
     assert res_orders.status_code == 200
     assert 'بتحصيل شحن: 370' not in res_orders.get_data(as_text=True)
 
+def test_courier_settlement_custom_collected_and_fee_deficit(client):
+    with app.app_context():
+        comp = Company(name="شركة التعويض")
+        cour = Courier(name="مندوب التعويض")
+        db.session.add_all([comp, cour])
+        db.session.commit()
+        
+        order = Order(
+            tracking_number="TRK-DEFICIT-1",
+            client_name="عميل التعويض",
+            phone="01099881122",
+            cod=370.0,
+            shipping_fee=70.0,
+            status="مع المندوب",
+            company_id=comp.id,
+            courier_id=cour.id
+        )
+        db.session.add(order)
+        db.session.commit()
+        order_id = order.id
+        cour_id = cour.id
+
+    # Courier collected only 20 EGP from customer on return, but commission is 50 EGP (company pays 30 EGP deficit)
+    res_settle = client.post(f'/accounting/courier?courier_id={cour_id}', data={
+        'action': 'settle',
+        f'status_{order_id}': 'مرتجع بشحن',
+        f'collected_{order_id}': '20',
+        f'courier_fee_{order_id}': '50',
+        'transfers': '0'
+    }, follow_redirects=True)
+    assert res_settle.status_code == 200
+
+    with app.app_context():
+        o = db.session.get(Order, order_id)
+        assert o.status == 'مرتجع'
+        assert o.collected_amount == 20.0
+        assert o.courier_fee == 50.0
+
+        # Treasury payout transaction recorded: -30.0 EGP
+        tx = TreasuryTransaction.query.filter_by(entity_id=cour_id, tx_type='صرف_لمندوب').first()
+        assert tx is not None
+        assert tx.amount == -30.0
+
+
 
 
 
