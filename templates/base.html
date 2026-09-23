@@ -45,26 +45,40 @@
             padding: 0.5em 0.8em;
             border-radius: 6px;
         }
-        .blurred-net-amount {
+        .orders-summary-blur-card {
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .orders-summary-blur-card .card-sensitive-val {
             filter: blur(6px);
             transition: filter 0.2s ease, opacity 0.2s ease;
             user-select: none;
             -webkit-user-select: none;
-            cursor: pointer;
             display: inline-block;
         }
-        .blurred-net-amount.revealed {
+        /* 1. Hover on card reveals numbers temporarily */
+        .orders-summary-blur-card:hover .card-sensitive-val {
             filter: none;
             user-select: text;
             -webkit-user-select: text;
         }
-        .blurred-net-btn {
-            opacity: 0.8;
-            transition: opacity 0.2s, transform 0.1s;
+        .orders-summary-blur-card:not(.is-pinned):hover #summaryCardEyeIcon::before {
+            content: "\f06e"; /* fa-eye */
         }
-        .blurred-net-btn:hover {
+        /* 2. Pinned state keeps numbers revealed fixed */
+        .orders-summary-blur-card.is-pinned .card-sensitive-val {
+            filter: none !important;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+        .summary-eye-btn {
+            opacity: 0.8;
+            transition: opacity 0.2s, transform 0.15s;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .summary-eye-btn:hover {
             opacity: 1;
-            transform: scale(1.15);
+            transform: scale(1.2);
         }
     </style>
 </head>
