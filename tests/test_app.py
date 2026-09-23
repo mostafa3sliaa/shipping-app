@@ -1014,6 +1014,65 @@ def test_returned_company_hidden_by_default_in_orders_log(client):
     assert 'DEL-999' in html_all
     assert 'PART-999' in html_all
 
+def test_empty_regions_couriers_omitted_from_filter(client):
+    with app.app_context():
+        comp_active = Company(name='شركة الفلتر النشطة')
+        comp_empty = Company(name='شركة الفلتر الفارغة')
+        courier_active = Courier(name='مندوب نشط بالشغل')
+        courier_empty = Courier(name='مندوب فاضي تماما')
+        db.session.add_all([comp_active, comp_empty, courier_active, courier_empty])
+        db.session.commit()
+
+        # Active order for courier_active in 'منطقة المعادي النشطة'
+        o1 = Order(
+            tracking_number='FLT-ACT-01',
+            company_id=comp_active.id,
+            courier_id=courier_active.id,
+            region='المعادي النشطة',
+            status='مع المندوب',
+            cod=500.0,
+            shipping_fee=50.0
+        )
+        # Completed delivered order in 'منطقة شبرا المنتهية' (no active work here)
+        o2 = Order(
+            tracking_number='FLT-DEL-02',
+            company_id=comp_active.id,
+            courier_id=courier_active.id,
+            region='شبرا المنتهية',
+            status='تم التوصيل',
+            cod=300.0,
+            shipping_fee=40.0
+        )
+        db.session.add_all([o1, o2])
+        db.session.commit()
+
+    # 1. In default orders view:
+    res = client.get('/?tab=orders')
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+
+    # Verify filter dropdown selects specifically
+    company_select = html.split('<select name="company_id"')[1].split('</select>')[0]
+    courier_select = html.split('<select name="courier_id"')[1].split('</select>')[0]
+    region_select = html.split('<select name="region"')[1].split('</select>')[0]
+
+    # Active courier & company & region must be in filter dropdown:
+    assert 'مندوب نشط بالشغل' in courier_select
+    assert 'شركة الفلتر النشطة' in company_select
+    assert 'المعادي النشطة' in region_select
+
+    # Empty courier & company & region without active work MUST NOT be in the filter dropdown!
+    assert 'مندوب فاضي تماما' not in courier_select
+    assert 'شركة الفلتر الفارغة' not in company_select
+    assert 'شبرا المنتهية' not in region_select
+
+    # 2. When filtering by 'تم التوصيل', 'شبرا المنتهية' should appear in region select!
+    res_del = client.get('/?tab=orders&status=تم التوصيل')
+    assert res_del.status_code == 200
+    html_del = res_del.get_data(as_text=True)
+    region_select_del = html_del.split('<select name="region"')[1].split('</select>')[0]
+    assert 'شبرا المنتهية' in region_select_del
+
 
 
 

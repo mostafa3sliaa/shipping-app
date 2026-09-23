@@ -364,8 +364,8 @@
                             <option value="">-- كل الشركات (الكل) --</option>
                             <option value="all" {% if filter_company == 'all' %}selected{% endif %}>-- الشركات فقط --</option>
                             <option value="none" {% if filter_company == 'none' %}selected{% endif %}>-- بدون شركة --</option>
-                            {% for company in companies %}
-                            <option value="{{ company.id }}" {% if filter_company == company.id|string %}selected{% endif %}>{{ company.name }}</option>
+                            {% for company in filter_companies %}
+                            <option value="{{ company.id }}" {% if filter_company == company.id|string %}selected{% endif %}>{{ company.name }} ({{ company.count }})</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -375,8 +375,8 @@
                             <option value="">-- كل المناديب (الكل) --</option>
                             <option value="all" {% if filter_courier == 'all' %}selected{% endif %}>-- المناديب فقط --</option>
                             <option value="none" {% if filter_courier == 'none' %}selected{% endif %}>-- بدون مندوب --</option>
-                            {% for c in couriers %}
-                            <option value="{{ c.id }}" {% if filter_courier == c.id|string %}selected{% endif %}>{{ c.name }}</option>
+                            {% for c in filter_couriers %}
+                            <option value="{{ c.id }}" {% if filter_courier == c.id|string %}selected{% endif %}>{{ c.name }} ({{ c.count }})</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -386,8 +386,8 @@
                             <option value="">-- كل المناطق (الكل) --</option>
                             <option value="all" {% if filter_region == 'all' %}selected{% endif %}>-- المناطق المحددة فقط --</option>
                             <option value="none" {% if filter_region == 'none' %}selected{% endif %}>-- بدون منطقة (غير محدد) --</option>
-                            {% for r in regions %}
-                            <option value="{{ r }}" {% if filter_region == r %}selected{% endif %}>{{ r }}</option>
+                            {% for r in filter_regions %}
+                            <option value="{{ r.name }}" {% if filter_region == r.name %}selected{% endif %}>{{ r.name }} ({{ r.count }})</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -398,8 +398,8 @@
                             <option value="none" {% if filter_status == 'none' %}selected{% endif %}>-- بدون حالة --</option>
                             <option value="all_returns" {% if filter_status == 'all_returns' %}selected{% endif %}>-- كل المرتجعات (الجزئي + المرتجع) --</option>
                             <option value="all_inclusive" {% if filter_status == 'all_inclusive' %}selected{% endif %}>-- كل الحالات بالكامل (شامل المسلم والمرتجع) --</option>
-                            {% for status in statuses %}
-                            <option value="{{ status }}" {% if filter_status == status %}selected{% endif %}>{{ status }}</option>
+                            {% for s in filter_statuses %}
+                            <option value="{{ s.name }}" {% if filter_status == s.name %}selected{% endif %}>{{ s.name }} ({{ s.count }})</option>
                             {% endfor %}
                         </select>
                     </div>

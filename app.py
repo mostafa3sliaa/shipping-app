@@ -489,8 +489,68 @@ def index():
     all_statuses = ['مخزن', 'مع المندوب', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع', 'مرتجع شركة', 'مؤجل']
     statuses = all_statuses
     
-    # Active regions in DB
+    # All registered regions in DB (for datalists in modals)
     regions = [r[0] for r in db.session.query(Order.region).filter(and_(Order.region.isnot(None), Order.region != '', Order.region != 'غير محدد')).distinct().all()]
+
+    # Filter-specific active entities (exclude empty regions, couriers, companies, and statuses with 0 active orders)
+    if filter_status:
+        if filter_status == 'none':
+            status_scope = or_(Order.status.is_(None), Order.status == '')
+        elif filter_status == 'all_returns':
+            status_scope = Order.status.in_(['مرتجع', 'تسليم جزئي / مرتجع', 'مرتجع بشحن'])
+        elif filter_status == 'all_inclusive':
+            status_scope = None
+        else:
+            status_scope = (Order.status == filter_status)
+    else:
+        status_scope = or_(~Order.status.in_(['مرتجع شركة', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'تسليم جزئي']), Order.status.is_(None))
+
+    # 1. Active Regions (omit empty regions)
+    active_regions_q = db.session.query(Order.region, db.func.count(Order.id))\
+        .filter(and_(Order.region.isnot(None), Order.region != '', Order.region != 'غير محدد'))
+    if status_scope is not None:
+        active_regions_q = active_regions_q.filter(status_scope)
+    filter_regions = [{'name': r[0], 'count': r[1]} for r in active_regions_q.group_by(Order.region).having(db.func.count(Order.id) > 0).order_by(Order.region).all()]
+    if filter_region and filter_region not in ['all', 'none']:
+        if not any(r['name'] == filter_region for r in filter_regions):
+            filter_regions.append({'name': filter_region, 'count': 0})
+
+    # 2. Active Couriers (omit empty couriers)
+    active_couriers_q = db.session.query(Courier.id, Courier.name, db.func.count(Order.id))\
+        .join(Order, Courier.id == Order.courier_id)
+    if status_scope is not None:
+        active_couriers_q = active_couriers_q.filter(status_scope)
+    filter_couriers = [{'id': c[0], 'name': c[1], 'count': c[2]} for c in active_couriers_q.group_by(Courier.id, Courier.name).having(db.func.count(Order.id) > 0).order_by(Courier.name).all()]
+    if filter_courier and filter_courier not in ['all', 'none']:
+        if not any(str(c['id']) == str(filter_courier) for c in filter_couriers):
+            selected_c = db.session.get(Courier, int(filter_courier)) if str(filter_courier).isdigit() else None
+            if selected_c:
+                filter_couriers.append({'id': selected_c.id, 'name': selected_c.name, 'count': 0})
+
+    # 3. Active Companies (omit empty companies)
+    active_companies_q = db.session.query(Company.id, Company.name, db.func.count(Order.id))\
+        .join(Order, Company.id == Order.company_id)
+    if status_scope is not None:
+        active_companies_q = active_companies_q.filter(status_scope)
+    filter_companies = [{'id': comp[0], 'name': comp[1], 'count': comp[2]} for comp in active_companies_q.group_by(Company.id, Company.name).having(db.func.count(Order.id) > 0).order_by(Company.name).all()]
+    if filter_company and filter_company not in ['all', 'none']:
+        if not any(str(comp['id']) == str(filter_company) for comp in filter_companies):
+            selected_comp = db.session.get(Company, int(filter_company)) if str(filter_company).isdigit() else None
+            if selected_comp:
+                filter_companies.append({'id': selected_comp.id, 'name': selected_comp.name, 'count': 0})
+
+    # 4. Active Statuses (omit statuses with 0 orders)
+    active_statuses_q = db.session.query(Order.status, db.func.count(Order.id))\
+        .filter(and_(Order.status.isnot(None), Order.status != ''))\
+        .group_by(Order.status).having(db.func.count(Order.id) > 0).all()
+    status_order_map = {'مخزن': 1, 'مع المندوب': 2, 'تم التوصيل': 3, 'تسليم جزئي / مرتجع': 4, 'مرتجع': 5, 'مرتجع شركة': 6, 'مؤجل': 7}
+    filter_statuses = [
+        {'name': s[0], 'count': s[1]}
+        for s in sorted(active_statuses_q, key=lambda x: status_order_map.get(x[0], 99))
+    ]
+    if filter_status and filter_status not in ['all_returns', 'all_inclusive', 'none']:
+        if not any(s['name'] == filter_status for s in filter_statuses):
+            filter_statuses.append({'name': filter_status, 'count': 0})
     
     # Scanned order logic
     scanned_orders = []
@@ -538,6 +598,10 @@ def index():
                            companies=companies,
                            statuses=statuses,
                            all_statuses=all_statuses,
+                           filter_companies=filter_companies,
+                           filter_couriers=filter_couriers,
+                           filter_regions=filter_regions,
+                           filter_statuses=filter_statuses,
                            partial_goods=partial_goods,
                            active_tab=active_tab,
                            scanned_orders=scanned_orders,
