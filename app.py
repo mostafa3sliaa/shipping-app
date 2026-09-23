@@ -431,7 +431,7 @@ def index():
             query = query.filter_by(status=filter_status)
     else:
         if not search_query:
-            query = query.filter(or_(~Order.status.in_(['مرتجع شركة', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'تسليم جزئي']), Order.status.is_(None)))
+            query = query.filter(or_(~Order.status.in_(['مرتجع شركة', 'تم التوصيل']), Order.status.is_(None)))
         
     if filter_courier:
         if filter_courier == 'none':
@@ -507,7 +507,7 @@ def index():
         else:
             status_scope = (Order.status == filter_status)
     else:
-        status_scope = or_(~Order.status.in_(['مرتجع شركة', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'تسليم جزئي']), Order.status.is_(None))
+        status_scope = or_(~Order.status.in_(['مرتجع شركة', 'تم التوصيل']), Order.status.is_(None))
 
     # 1. Active Regions (omit empty regions)
     active_regions_q = db.session.query(Order.region, db.func.count(Order.id))\
@@ -661,7 +661,7 @@ def export_excel():
                 query = query.filter_by(status=filter_status)
         else:
             if not search_query:
-                query = query.filter(or_(~Order.status.in_(['مرتجع شركة', 'تم التوصيل', 'تسليم جزئي / مرتجع', 'تسليم جزئي']), Order.status.is_(None)))
+                query = query.filter(or_(~Order.status.in_(['مرتجع شركة', 'تم التوصيل']), Order.status.is_(None)))
         if filter_courier:
             if filter_courier == 'none':
                 query = query.filter(Order.courier_id.is_(None))
