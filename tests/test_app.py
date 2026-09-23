@@ -919,9 +919,9 @@ def test_filter_all_returns_and_net_display(client):
     assert 'RET-COMPANY-1' not in html
 
     # Total orders count for all_returns: 2
-    # Net without shipping: o1 (300) + o2 (200) = 500.00 ج.م
+    # Net without shipping: o1 (300) + o2 (230 returned goods) = 530.00 ج.م
     assert 'بدون الشحن:' in html
-    assert '500.00 ج.م' in html
+    assert '530.00 ج.م' in html
 
     # 2. Filter by warehouse (status=مخزن)
     resp_wh = client.get('/?tab=orders&status=مخزن')

@@ -450,13 +450,17 @@ def index():
             query = query.filter_by(region=filter_region)
         
     # Get aggregates efficiently from DB in 1 single fast query
+    cod_expr = db.case(
+        (Order.status == 'تسليم جزئي / مرتجع', db.func.coalesce(Order.cod, 0.0) - db.func.coalesce(Order.collected_amount, 0.0)),
+        else_=db.func.coalesce(Order.cod, 0.0)
+    )
     net_expr = db.case(
-        (Order.status == 'تسليم جزئي / مرتجع', db.func.coalesce(Order.collected_amount, Order.cod) - db.func.coalesce(Order.shipping_fee, 0.0)),
+        (Order.status == 'تسليم جزئي / مرتجع', db.func.coalesce(Order.cod, 0.0) - db.func.coalesce(Order.collected_amount, 0.0)),
         else_=db.func.coalesce(Order.cod, 0.0) - db.func.coalesce(Order.shipping_fee, 0.0)
     )
     agg = query.with_entities(
         db.func.count(Order.id),
-        db.func.sum(Order.cod),
+        db.func.sum(cod_expr),
         db.func.sum(Order.shipping_fee),
         db.func.sum(net_expr)
     ).first()
