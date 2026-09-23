@@ -299,8 +299,9 @@ def index():
     else:
         active_tab = req_tab
 
-    # 1. Fetch dashboard stats ONLY if viewing dashboard tab
-    if active_tab == 'dashboard':
+    # 1. Fetch dashboard stats for all standard page loads (skip only for AJAX infinite scroll)
+    is_ajax_scroll = request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+    if not is_ajax_scroll:
         metrics = db.session.query(
             Order.status,
             db.func.count(Order.id),
