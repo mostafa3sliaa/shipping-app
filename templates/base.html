@@ -45,6 +45,27 @@
             padding: 0.5em 0.8em;
             border-radius: 6px;
         }
+        .blurred-net-amount {
+            filter: blur(6px);
+            transition: filter 0.2s ease, opacity 0.2s ease;
+            user-select: none;
+            -webkit-user-select: none;
+            cursor: pointer;
+            display: inline-block;
+        }
+        .blurred-net-amount.revealed {
+            filter: none;
+            user-select: text;
+            -webkit-user-select: text;
+        }
+        .blurred-net-btn {
+            opacity: 0.8;
+            transition: opacity 0.2s, transform 0.1s;
+        }
+        .blurred-net-btn:hover {
+            opacity: 1;
+            transform: scale(1.15);
+        }
     </style>
 </head>
 <body>

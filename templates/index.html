@@ -322,14 +322,19 @@
                 </form>
             </div>
 
-            <div class="card bg-primary text-white border-0 shadow-sm rounded-4 d-none d-lg-block" style="min-width: 175px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
+            <div class="card bg-primary text-white border-0 shadow-sm rounded-4 d-none d-lg-block" style="min-width: 185px; background: linear-gradient(45deg, #0d6efd, #0dcaf0);">
                 <div class="card-body d-flex justify-content-between align-items-center py-2 px-3">
                     <div>
                         <h6 class="mb-0 fw-bold text-white-50" style="font-size: 0.8rem;">إجمالي الأوردرات</h6>
                         <h4 class="mb-0 fw-bold">{{ filtered_orders_count }}</h4>
-                        <div class="mt-1 pt-1 border-top border-white border-opacity-25" style="font-size: 0.78rem; white-space: nowrap;" title="إجمالي قيمة الأوردرات بدون مصاريف الشحن">
-                            <span class="text-white-50">بدون الشحن:</span>
-                            <span class="fw-bold text-white">{{ "{:,.2f}".format(filtered_net) }} ج.م</span>
+                        <div class="mt-1 pt-1 border-top border-white border-opacity-25 d-flex align-items-center justify-content-between gap-2" style="font-size: 0.78rem; white-space: nowrap;" title="إجمالي قيمة الأوردرات بدون مصاريف الشحن">
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="text-white-50">بدون الشحن:</span>
+                                <span id="filteredNetValue" class="fw-bold text-white blurred-net-amount" onclick="toggleNetBlur()" title="اضغط للإظهار / الإخفاء">{{ "{:,.2f}".format(filtered_net) }} ج.م</span>
+                            </div>
+                            <button type="button" class="btn btn-link text-white p-0 text-decoration-none blurred-net-btn" onclick="toggleNetBlur()" title="إظهار / إخفاء المبلغ" style="line-height: 1;" aria-label="إظهار / إخفاء المبلغ">
+                                <i id="toggleNetEyeIcon" class="fa-solid fa-eye-slash" style="font-size: 0.85rem;"></i>
+                            </button>
                         </div>
                     </div>
                     <i class="fa-solid fa-boxes-stacked fa-2x text-white opacity-50 ms-2"></i>
@@ -1343,6 +1348,59 @@
     window.updateSelectAllState = updateSelectAllState;
     window.updateSelectedCount = updateSelectedCount;
 
+    // Toggle blur / pixelation on Net Amount
+    function toggleNetBlur() {
+        const netEl = document.getElementById('filteredNetValue');
+        const eyeIcon = document.getElementById('toggleNetEyeIcon');
+        if (!netEl) return;
+
+        const isCurrentlyRevealed = netEl.classList.contains('revealed');
+        if (isCurrentlyRevealed) {
+            netEl.classList.remove('revealed');
+            if (eyeIcon) {
+                eyeIcon.classList.remove('fa-eye');
+                eyeIcon.classList.add('fa-eye-slash');
+                if (eyeIcon.parentElement) eyeIcon.parentElement.setAttribute('title', 'إظهار المبلغ');
+            }
+            sessionStorage.setItem('net_amount_revealed', 'false');
+        } else {
+            netEl.classList.add('revealed');
+            if (eyeIcon) {
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+                if (eyeIcon.parentElement) eyeIcon.parentElement.setAttribute('title', 'إخفاء المبلغ');
+            }
+            sessionStorage.setItem('net_amount_revealed', 'true');
+        }
+    }
+
+    function initNetBlur() {
+        const netEl = document.getElementById('filteredNetValue');
+        const eyeIcon = document.getElementById('toggleNetEyeIcon');
+        if (!netEl) return;
+
+        const isRevealed = sessionStorage.getItem('net_amount_revealed') === 'true';
+        if (isRevealed) {
+            netEl.classList.add('revealed');
+            if (eyeIcon) {
+                eyeIcon.classList.remove('fa-eye-slash');
+                eyeIcon.classList.add('fa-eye');
+                if (eyeIcon.parentElement) eyeIcon.parentElement.setAttribute('title', 'إخفاء المبلغ');
+            }
+        } else {
+            netEl.classList.remove('revealed');
+            if (eyeIcon) {
+                eyeIcon.classList.remove('fa-eye');
+                eyeIcon.classList.add('fa-eye-slash');
+                if (eyeIcon.parentElement) eyeIcon.parentElement.setAttribute('title', 'إظهار المبلغ');
+            }
+        }
+    }
+
+    window.toggleNetBlur = toggleNetBlur;
+    window.initNetBlur = initNetBlur;
+    initNetBlur();
+
     if (!window._selectAllListenerAttached) {
         window._selectAllListenerAttached = true;
         document.addEventListener('change', function(e) {
@@ -1991,6 +2049,9 @@
     // Also run when Turbo injects new HTML
     document.addEventListener('turbo:load', function() {
         setTimeout(initInfiniteScroll, 100);
+        if (typeof window.initNetBlur === 'function') {
+            window.initNetBlur();
+        }
     });
 })();
 </script>
