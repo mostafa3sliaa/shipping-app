@@ -117,7 +117,7 @@
                                     </td>
                                     <td>
                                         <div class="input-group input-group-sm">
-                                            <input type="number" step="0.01" name="courier_fee_{{ order.id }}" id="courier_fee_{{ order.id }}" class="form-control text-danger fw-bold fee-input" value="0" oninput="updateRow('{{ order.id }}')">
+                                            <input type="number" step="0.01" name="courier_fee_{{ order.id }}" id="courier_fee_{{ order.id }}" class="form-control text-danger fw-bold fee-input" value="0" oninput="updateTotals()">
                                         </div>
                                     </td>
                                     <td class="fw-bold fs-5">
@@ -183,14 +183,13 @@
                         if(bulkFee !== "") {
                             const feeInputs = document.querySelectorAll('.fee-input');
                             feeInputs.forEach(input => {
-                                // Only apply if the order is settled (not 'مع المندوب' or 'مؤجل')
                                 const id = input.id.split('_')[2];
                                 const status = document.getElementById('status_' + id).value;
-                                if (status !== 'مع المندوب' && status !== 'مؤجل') {
+                                if (status !== 'مع المندوب' && status !== 'مؤجل' && status !== 'مرتجع_مخزن') {
                                     input.value = bulkFee;
-                                    updateRow(id);
                                 }
                             });
+                            updateTotals();
                         }
                     }
 
@@ -206,33 +205,41 @@
                             collectedInput.value = "0";
                             collectedInput.readOnly = true;
                             feeInput.value = "0";
+                            feeInput.readOnly = true;
                             row.classList.remove('table-success', 'table-warning', 'table-danger', 'table-info');
                             row.classList.add('bg-light');
                         } else if (status === 'تم التوصيل') {
-                            if (!manualCollected && collectedInput.value == "0") collectedInput.value = cod;
+                            if (!manualCollected && (collectedInput.value == "0" || collectedInput.value == "")) collectedInput.value = cod;
                             collectedInput.readOnly = false;
+                            feeInput.readOnly = false;
                             row.classList.remove('bg-light', 'table-warning', 'table-danger', 'table-info');
                             row.classList.add('table-success');
                         } else if (status === 'تسليم جزئي / مرتجع') {
-                            if (!manualCollected && collectedInput.value == "0") collectedInput.value = cod;
+                            if (!manualCollected && (collectedInput.value == "0" || collectedInput.value == "")) collectedInput.value = cod;
                             collectedInput.readOnly = false;
+                            feeInput.readOnly = false;
                             row.classList.remove('bg-light', 'table-success', 'table-danger', 'table-info');
                             row.classList.add('table-warning');
                         } else if (status === 'مرتجع_مخزن') {
                             collectedInput.value = "0";
                             collectedInput.readOnly = true;
                             feeInput.value = "0";
+                            feeInput.readOnly = true;
                             row.classList.remove('bg-light', 'table-success', 'table-warning', 'table-danger');
                             row.classList.add('table-info');
                         } else if (status === 'مرتجع' || status === 'مرتجع شركة') {
                             collectedInput.value = "0";
                             collectedInput.readOnly = true;
-                            feeInput.value = "0";
+                            feeInput.readOnly = false;
                             row.classList.remove('bg-light', 'table-success', 'table-warning', 'table-info');
                             row.classList.add('table-danger');
                         } else if (status === 'مرتجع بشحن') {
-                            if (!manualCollected && collectedInput.value == "0") collectedInput.value = shipping;
+                            const curVal = parseFloat(collectedInput.value) || 0;
+                            if (!manualCollected || curVal === cod || curVal === 0 || collectedInput.value === "") {
+                                collectedInput.value = (shipping > 0) ? shipping : 70;
+                            }
                             collectedInput.readOnly = false;
+                            feeInput.readOnly = false;
                             row.classList.remove('bg-light', 'table-success', 'table-danger', 'table-info');
                             row.classList.add('table-warning');
                         }

@@ -1194,6 +1194,9 @@ def bulk_action():
         for order in orders_to_update:
             if order.status == 'تم التوصيل' and order.courier_settled:
                 reverse_order_treasury_collection(order, reason='تحويل لمرتجع شركة')
+            else:
+                order.collected_amount = None
+                order.courier_fee = None
             order.status = 'مرتجع شركة'
         updated_details.append('الحالة: مرتجع شركة')
     elif action == 'delivered':
@@ -1206,6 +1209,9 @@ def bulk_action():
         for order in orders_to_update:
             if order.courier_settled:
                 reverse_order_treasury_collection(order, reason='تحويل لمرتجع')
+            else:
+                order.collected_amount = None
+                order.courier_fee = None
             order.status = 'مرتجع'
         updated_details.append('الحالة: مرتجع')
     elif action == 'unmark_copied':
@@ -1285,6 +1291,9 @@ def edit_order(order_id):
         pass
 
     order.status = new_status
+    if new_status in ['مرتجع', 'مرتجع شركة']:
+        if order.collected_amount is not None and order.cod and order.collected_amount >= order.cod and order.cod > (order.shipping_fee or 0):
+            order.collected_amount = None
 
     # Status transitions & Treasury accounting logic
     new_collected = order.collected_amount or 0.0

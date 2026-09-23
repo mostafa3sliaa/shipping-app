@@ -1073,6 +1073,66 @@ def test_empty_regions_couriers_omitted_from_filter(client):
     region_select_del = html_del.split('<select name="region"')[1].split('</select>')[0]
     assert 'شبرا المنتهية' in region_select_del
 
+def test_orders_summary_card_with_shipping_and_return_reset(client):
+    with app.app_context():
+        comp = Company(name="شركة الملخص")
+        db.session.add(comp)
+        db.session.commit()
+        
+        order = Order(
+            tracking_number="TRK-SUMM-1",
+            client_name="عميل الملخص",
+            phone="01011112222",
+            cod=370.0,
+            shipping_fee=70.0,
+            status="مخزن",
+            company_id=comp.id
+        )
+        db.session.add(order)
+        db.session.commit()
+        order_id = order.id
+
+    # 1. Verify 'بدون الشحن' and 'بالشحن' both appear in orders summary card
+    res = client.get('/?tab=orders')
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
+    assert 'بدون الشحن:' in html
+    assert 'بالشحن:' in html
+    assert '300.00' in html  # 370 - 70 = 300 net
+    assert '370.00' in html  # 370 total COD with shipping
+
+    # 2. Simulate order being delivered with 370 collected
+    with app.app_context():
+        o = db.session.get(Order, order_id)
+        o.status = 'تم التوصيل'
+        o.collected_amount = 370.0
+        db.session.commit()
+
+    # 3. Edit order to 'مرتجع' without resetting collected_amount
+    res_edit = client.post(f'/order/{order_id}/edit', data={
+        'client_name': 'عميل الملخص',
+        'phone': '01011112222',
+        'address': 'عنوان',
+        'region': 'القاهرة',
+        'cod': '370',
+        'shipping_fee': '70',
+        'status': 'مرتجع',
+        'collected_amount': '370'  # accidentally submitted full COD
+    }, follow_redirects=True)
+    assert res_edit.status_code == 200
+
+    # Verify backend reset collected_amount to None so 370 is NOT shown as return shipping!
+    with app.app_context():
+        o = db.session.get(Order, order_id)
+        assert o.status == 'مرتجع'
+        assert o.collected_amount is None
+
+    # Check html does not contain 'بتحصيل شحن: 370'
+    res_orders = client.get('/?tab=orders&status=مرتجع')
+    assert res_orders.status_code == 200
+    assert 'بتحصيل شحن: 370' not in res_orders.get_data(as_text=True)
+
+
 
 
 

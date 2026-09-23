@@ -337,6 +337,10 @@
                                 <span class="text-white-50">بدون الشحن:</span>
                                 <span class="fw-bold text-white card-sensitive-val">{{ "{:,.2f}".format(filtered_net) }} ج.م</span>
                             </div>
+                            <div class="mt-1" style="font-size: 0.78rem; white-space: nowrap;" title="إجمالي قيمة الأوردرات شاملة مصاريف الشحن">
+                                <span class="text-white-50">بالشحن:</span>
+                                <span class="fw-bold text-white card-sensitive-val">{{ "{:,.2f}".format(filtered_cod) }} ج.م</span>
+                            </div>
                         </div>
                         <i class="fa-solid fa-boxes-stacked fa-2x text-white opacity-50 ms-3"></i>
                     </div>
@@ -560,12 +564,12 @@
                                             <span class="badge bg-secondary">مؤجل</span>
                                         {% elif order.status == 'مرتجع' %}
                                             <span class="badge bg-danger">مرتجع</span>
-                                            {% if order.collected_amount is not none and order.collected_amount > 0 %}
+                                            {% if order.collected_amount is not none and order.collected_amount > 0 and (order.cod is none or order.collected_amount < order.cod) %}
                                             <small class="text-success d-block fw-bold mt-1" style="font-size: 0.72rem;" title="تم تحصيل مصاريف الشحن من العميل بواسطة المندوب"><i class="fa-solid fa-coins me-1"></i>بتحصيل شحن: {{ "{:,.0f}".format(order.collected_amount) }}</small>
                                             {% endif %}
                                         {% elif order.status == 'مرتجع شركة' %}
                                             <span class="badge bg-dark">مرتجع شركة</span>
-                                            {% if order.collected_amount is not none and order.collected_amount > 0 %}
+                                            {% if order.collected_amount is not none and order.collected_amount > 0 and (order.cod is none or order.collected_amount < order.cod) %}
                                             <small class="text-success d-block fw-bold mt-1" style="font-size: 0.72rem;" title="تم تحصيل مصاريف الشحن من العميل"><i class="fa-solid fa-coins me-1"></i>بتحصيل شحن: {{ "{:,.0f}".format(order.collected_amount) }}</small>
                                             {% endif %}
                                         {% else %}
@@ -687,8 +691,9 @@
                             <!-- Partial Delivery & Accounting Fields -->
                             <div class="row bg-warning bg-opacity-10 p-2 rounded mt-2 border border-warning" id="single-accounting-fields" style="display: none;">
                                 <div class="col-md-6 mb-2">
-                                    <label class="form-label fw-bold text-success">المبلغ المُحصل فعلياً</label>
+                                    <label class="form-label fw-bold text-success" id="single_col_label">المبلغ المُحصل فعلياً</label>
                                     <input type="number" step="0.01" name="collected_amount" id="edit_collected_amount" class="form-control">
+                                    <small class="text-muted d-block mt-1" id="single_col_hint" style="font-size: 0.72rem;"></small>
                                 </div>
                                 <div class="col-md-6 mb-2">
                                     <label class="form-label fw-bold text-primary">عمولة المندوب (المتفق عليها)</label>
@@ -1485,8 +1490,34 @@
 
     function togglePartialDeliverySingle(selectElement) {
         const fields = document.getElementById('single-accounting-fields');
-        if (selectElement.value === 'تسليم جزئي / مرتجع' || selectElement.value === 'تم التوصيل' || selectElement.value === 'مرتجع') {
+        const status = selectElement.value;
+        const colInput = document.getElementById('edit_collected_amount');
+        const codInput = document.getElementById('edit_cod');
+        const shipInput = document.getElementById('edit_shipping_fee');
+        const colLabel = document.getElementById('single_col_label');
+        const colHint = document.getElementById('single_col_hint');
+        
+        if (status === 'تسليم جزئي / مرتجع' || status === 'تم التوصيل' || status === 'مرتجع') {
             fields.style.display = 'flex';
+            const currentCod = parseFloat(codInput ? codInput.value : 0) || 0;
+            const currentCol = parseFloat(colInput ? colInput.value : 0) || 0;
+            
+            if (status === 'مرتجع') {
+                if (colLabel) colLabel.innerText = 'مصاريف الشحن المحصلة (إن وجدت)';
+                if (colHint) colHint.innerText = 'اتركها 0 لو مرتجع عادي، أو اكتب قيمة الشحن فقط (مثلاً 70) لو مرتجع بشحن';
+                if (currentCol === currentCod && currentCod > 0) {
+                    colInput.value = '';
+                }
+            } else if (status === 'تم التوصيل') {
+                if (colLabel) colLabel.innerText = 'المبلغ المُحصل فعلياً';
+                if (colHint) colHint.innerText = 'إجمالي المبلغ المطلوب تحصيله (COD)';
+                if (!colInput.value || currentCol === 0) {
+                    colInput.value = currentCod;
+                }
+            } else {
+                if (colLabel) colLabel.innerText = 'المبلغ المُحصل فعلياً';
+                if (colHint) colHint.innerText = 'ثمن القطع المستلمة + الشحن';
+            }
         } else {
             fields.style.display = 'none';
         }
@@ -1550,7 +1581,8 @@
             colHint.innerText = 'مرتجع بدون مصاريف شحن';
         } else if (val === 'مرتجع_بشحن') {
             colInput.readOnly = false;
-            if (parseFloat(colInput.value) <= 0) {
+            const curVal = parseFloat(colInput.value) || 0;
+            if (curVal <= 0 || (currentSettleCod > 0 && curVal === currentSettleCod)) {
                 colInput.value = shipInput.value || 70;
             }
             colLabel.innerText = 'مصاريف الشحن المحصلة';
