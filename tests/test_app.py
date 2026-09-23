@@ -408,11 +408,14 @@ def test_partial_delivery_display_and_reversal(client):
         db.session.add_all([o, tx])
         db.session.commit()
 
-    # 1. Test template display: Should show original COD 370.00 and Company Net 200.00 when filtered or searched
+    # 1. Test template display: Should show original COD 370.00, Delivered 200.00, and Returned 100.00
     res = client.get('/?tab=orders&status=تسليم جزئي / مرتجع')
     assert res.status_code == 200
     assert b'370.00' in res.data
     assert b'200.00' in res.data
+    assert 'المُسلّم:'.encode('utf-8') in res.data
+    assert 'المرتجع:'.encode('utf-8') in res.data
+    assert b'100.00' in res.data
 
     # 2. Test status change away from delivered/partial -> e.g. to 'مع المندوب'
     with app.app_context():

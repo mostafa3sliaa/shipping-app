@@ -541,7 +541,18 @@
                                     </td>
                                     <td class="fw-bold text-success">
                                         <div>{{ "{:,.2f}".format(order.cod) }}</div>
-                                        {% if order.collected_amount is not none and (order.status == 'تسليم جزئي / مرتجع' or (order.status == 'مرتجع شركة' and order.collected_amount > 0)) and order.collected_amount < order.cod %}
+                                        {% if order.status == 'تسليم جزئي / مرتجع' and order.collected_amount is not none and order.collected_amount < order.cod %}
+                                        <div class="mt-1 p-1 rounded bg-light border shadow-sm" style="font-size: 0.72rem; line-height: 1.4; text-align: start; min-width: 140px;">
+                                            <div class="text-success fw-bold" title="قيمة البضاعة المباعة والمسلمة للعميل (المحصل - الشحن)">
+                                                <i class="fa-solid fa-check-circle me-1"></i>المُسلّم: <span>{{ "{:,.2f}".format(order.collected_amount - (order.shipping_fee or 0.0)) }} ج.م</span>
+                                                <small class="text-muted d-block" style="font-size: 0.65rem;">(كاش للشركة)</small>
+                                            </div>
+                                            <div class="text-danger fw-bold mt-1 pt-1 border-top" title="قيمة البضاعة التي رفضها العميل وعادت للمخزن">
+                                                <i class="fa-solid fa-rotate-left me-1"></i>المرتجع: <span>{{ "{:,.2f}".format(order.cod - order.collected_amount) }} ج.م</span>
+                                                <small class="text-muted d-block" style="font-size: 0.65rem;">(بضاعة راجعة المخزن)</small>
+                                            </div>
+                                        </div>
+                                        {% elif order.collected_amount is not none and (order.status == 'مرتجع شركة' and order.collected_amount > 0) and order.collected_amount < order.cod %}
                                         <div class="mt-1">
                                             <span class="badge bg-warning text-dark border border-secondary" style="font-size: 0.75rem; font-weight: bold;" title="صافي قيمة البضاعة المسلمة للشركة بعد خصم المرتجع والشحن">
                                                 {{ "{:,.2f}".format(order.collected_amount - (order.shipping_fee or 0.0)) }} ج.م
