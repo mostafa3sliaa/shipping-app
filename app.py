@@ -281,6 +281,31 @@ def get_company_profit_data():
     company_profit = max(0.0, total_earned - total_profit_resets)
     return company_profit, total_earned, total_profit_resets, profit_orders
 
+def get_companies_overall_debt():
+    all_settled_orders = db.session.query(
+        db.func.sum(Order.collected_amount - Order.shipping_fee)
+    ).filter(Order.company_settled == True, Order.company_id.isnot(None)).scalar() or 0.0
+
+    manual_credits = db.session.query(
+        db.func.sum(TreasuryTransaction.amount)
+    ).filter_by(tx_type='إضافة_رصيد_لشركة').scalar() or 0.0
+
+    manual_debits = db.session.query(
+        db.func.sum(TreasuryTransaction.amount)
+    ).filter_by(tx_type='خصم_رصيد_من_شركة').scalar() or 0.0
+
+    payouts = abs(db.session.query(
+        db.func.sum(TreasuryTransaction.amount)
+    ).filter_by(tx_type='صرف_لشركة').scalar() or 0.0)
+
+    collections = db.session.query(
+        db.func.sum(TreasuryTransaction.amount)
+    ).filter_by(tx_type='تحصيل_من_شركة').scalar() or 0.0
+
+    total_owed = all_settled_orders + manual_credits - manual_debits
+    net_paid = payouts - collections
+    return total_owed - net_paid
+
 @app.route('/')
 @login_required
 def index():
@@ -342,7 +367,8 @@ def index():
         treasury_dict = dict(treasury_sums)
         treasury_cash = treasury_dict.get('كاش', 0.0)
         treasury_transfer = treasury_dict.get('تحويل', 0.0)
-        total_capital = treasury_cash + treasury_transfer + total_goods
+        total_companies_debt = get_companies_overall_debt()
+        total_capital = (treasury_cash + treasury_transfer + total_goods) - total_companies_debt
         
         active_couriers = Courier.query.count()
         
@@ -359,11 +385,12 @@ def index():
         ).join(Order).group_by(Company.name).all()
         
         deposit_history = TreasuryTransaction.query.filter(
-            TreasuryTransaction.tx_type.in_(['إيداع_يدوي', 'مصروفات', 'سحب_محفظة', 'تصفير_أرباح'])
+            TreasuryTransaction.tx_type.in_(['إيداع_يدوي', 'مصروفات', 'سحب_محفظة', 'تصفير_أرباح', 'صرف_لشركة', 'تحصيل_من_شركة'])
         ).order_by(TreasuryTransaction.created_at.desc()).limit(50).all()
     else:
         total_orders = 0
         total_goods = 0.0
+        total_companies_debt = 0.0
         total_capital = 0.0
         treasury_cash = 0.0
         treasury_transfer = 0.0
@@ -572,6 +599,7 @@ def index():
                            total_orders=total_orders, 
                            total_goods=total_goods,
                            total_capital=total_capital,
+                           total_companies_debt=total_companies_debt,
                            treasury_cash=treasury_cash,
                            treasury_transfer=treasury_transfer,
                            company_profit=company_profit,
@@ -1479,45 +1507,57 @@ def company_accounting():
     company_debt = 0.0
     company_paid = 0.0
     company_balance = 0.0
+    order_profits = 0.0
+    manual_debt = 0.0
+    manual_deduction = 0.0
+    paid_sum_val = 0.0
+    received_sum_val = 0.0
+    transactions = []
     
     if selected_company_id:
-        selected_company = Company.query.get(selected_company_id)
+        selected_company = db.session.get(Company, int(selected_company_id)) if str(selected_company_id).isdigit() else None
         if selected_company:
             # 1. Total Debt (Owed to Company) = Sum(Collected - Shipping) for orders that are company_settled=True
-            # Wait, if an order is returned with shipping fee, we collected shipping fee from customer, 
-            # so the company owes US the shipping fee, or we take it from the collected amount.
-            # Usually: Net = Collected_Amount - Shipping_Fee
             order_profits = db.session.query(
                 db.func.sum(Order.collected_amount - Order.shipping_fee)
             ).filter_by(company_id=selected_company.id, company_settled=True).scalar() or 0.0
             
-            # 1.5 Manual Debt Added to Company
+            # 1.5 Manual Debt Added to Company (علينا للشركة)
             manual_debt = db.session.query(
                 db.func.sum(TreasuryTransaction.amount)
             ).filter_by(tx_type='إضافة_رصيد_لشركة', entity_id=selected_company.id).scalar() or 0.0
+
+            # 1.6 Manual Debt Deducted from Company / Company Owes Us (لنا عند الشركة)
+            manual_deduction = db.session.query(
+                db.func.sum(TreasuryTransaction.amount)
+            ).filter_by(tx_type='خصم_رصيد_من_شركة', entity_id=selected_company.id).scalar() or 0.0
             
-            company_debt = order_profits + manual_debt
+            company_debt = order_profits + manual_debt - manual_deduction
             
             # 2. Total Paid to Company (Negative transactions in Treasury)
-            # When we pay the company, we insert a negative amount into TreasuryTransaction
-            # So the total paid is the absolute sum of these negative transactions
             paid_sum = db.session.query(
                 db.func.sum(TreasuryTransaction.amount)
             ).filter_by(tx_type='صرف_لشركة', entity_id=selected_company.id).scalar() or 0.0
+            paid_sum_val = abs(paid_sum)
+
+            # 2.5 Total Received from Company (Positive transactions in Treasury)
+            received_sum = db.session.query(
+                db.func.sum(TreasuryTransaction.amount)
+            ).filter_by(tx_type='تحصيل_من_شركة', entity_id=selected_company.id).scalar() or 0.0
+            received_sum_val = received_sum
             
-            company_paid = abs(paid_sum)
+            company_paid = paid_sum_val - received_sum_val
             
-            # 3. Current Balance
+            # 3. Current Balance (Positive: owed to company, Negative: owed by company to us)
             company_balance = company_debt - company_paid
             
-            # Fetch transaction history for this company (Both payouts and manual additions)
+            # Fetch transaction history for this company (payouts, collections, and manual debt adjustments)
             transactions = TreasuryTransaction.query.filter(
                 TreasuryTransaction.entity_id == selected_company.id,
-                TreasuryTransaction.tx_type.in_(['صرف_لشركة', 'إضافة_رصيد_لشركة'])
+                TreasuryTransaction.tx_type.in_(['صرف_لشركة', 'تحصيل_من_شركة', 'إضافة_رصيد_لشركة', 'خصم_رصيد_من_شركة'])
             ).order_by(TreasuryTransaction.created_at.desc()).all()
             
             # 4. Fetch orders ready to be settled (Delivered, Partial, Returned with shipping)
-            # We only settle orders that have reached a final status.
             orders = Order.query.options(joinedload(Order.courier)).filter(
                 Order.company_id == selected_company.id,
                 Order.company_settled == False,
@@ -1545,11 +1585,14 @@ def company_accounting():
         selected_company=selected_company, 
         orders=orders,
         company_debt=company_debt,
-        order_profits=order_profits if 'order_profits' in locals() else 0.0,
-        manual_debt=manual_debt if 'manual_debt' in locals() else 0.0,
+        order_profits=order_profits,
+        manual_debt=manual_debt,
+        manual_deduction=manual_deduction,
+        paid_sum_val=paid_sum_val,
+        received_sum_val=received_sum_val,
         company_paid=company_paid,
         company_balance=company_balance,
-        transactions=transactions if 'transactions' in locals() else []
+        transactions=transactions
     )
 
 @app.route('/api/company/<int:company_id>/pay', methods=['POST'])
@@ -1570,9 +1613,37 @@ def company_pay(company_id):
             )
             db.session.add(tx)
             db.session.commit()
-            flash(f'تم تسجيل سداد للشركة بمبلغ {amount} ({method}) بنجاح!', 'success')
+            flash(f'تم تسجيل سداد للشركة بمبلغ {amount:,.2f} ج.م ({method}) بنجاح!', 'success')
+        else:
+            flash('يجب إدخال مبلغ أكبر من الصفر', 'danger')
     except Exception as e:
         flash('حدث خطأ أثناء تسجيل الدفعة.', 'danger')
+        
+    return redirect(url_for('company_accounting', company_id=company_id))
+
+@app.route('/api/company/<int:company_id>/receive', methods=['POST'])
+def company_receive(company_id):
+    try:
+        amount = float(request.form.get('amount', 0))
+        method = request.form.get('method', 'كاش')
+        notes = request.form.get('notes', '')
+        
+        if amount > 0:
+            # Collection FROM company is an addition to our treasury, so amount is positive!
+            tx = TreasuryTransaction(
+                amount=amount,
+                method=method,
+                tx_type='تحصيل_من_شركة',
+                entity_id=company_id,
+                notes=notes
+            )
+            db.session.add(tx)
+            db.session.commit()
+            flash(f'تم تسجيل تحصيل من الشركة بمبلغ {amount:,.2f} ج.م ({method}) إلى الخزينة بنجاح!', 'success')
+        else:
+            flash('يجب إدخال مبلغ أكبر من الصفر', 'danger')
+    except Exception as e:
+        flash('حدث خطأ أثناء تسجيل التحصيل.', 'danger')
         
     return redirect(url_for('company_accounting', company_id=company_id))
 
@@ -1580,25 +1651,36 @@ def company_pay(company_id):
 def company_add_balance(company_id):
     try:
         amount = float(request.form.get('amount', 0))
+        balance_type = request.form.get('balance_type', 'credit_to_company')
         notes = request.form.get('notes', '')
         
         if amount > 0:
-            # Adding balance to the company means we owe them more, so it's positive.
-            # We use 'مديونية' method so it doesn't affect Cash/Wallet totals.
-            tx = TreasuryTransaction(
-                amount=amount,
-                method='مديونية',
-                tx_type='إضافة_رصيد_لشركة',
-                entity_id=company_id,
-                notes=notes
-            )
+            if balance_type == 'debit_from_company':
+                # مديونية على الشركة لصالحنا (لنا عندهم فلوس)
+                tx = TreasuryTransaction(
+                    amount=amount,
+                    method='مديونية',
+                    tx_type='خصم_رصيد_من_شركة',
+                    entity_id=company_id,
+                    notes=notes
+                )
+                flash(f'تم تسجيل مستحق لنا على الشركة بقيمة {amount:,.2f} ج.م بنجاح', 'success')
+            else:
+                # مديونية علينا للشركة
+                tx = TreasuryTransaction(
+                    amount=amount,
+                    method='مديونية',
+                    tx_type='إضافة_رصيد_لشركة',
+                    entity_id=company_id,
+                    notes=notes
+                )
+                flash(f'تمت إضافة مديونية بقيمة {amount:,.2f} ج.م لرصيد الشركة بنجاح', 'success')
             db.session.add(tx)
             db.session.commit()
-            flash(f'تمت إضافة مديونية بقيمة {amount} ج.م لرصيد الشركة بنجاح', 'success')
         else:
             flash('يجب إدخال مبلغ أكبر من الصفر', 'danger')
     except Exception as e:
-        flash('حدث خطأ أثناء الإضافة', 'danger')
+        flash('حدث خطأ أثناء تسجيل المعاملة.', 'danger')
         
     return redirect(url_for('company_accounting', company_id=company_id))
 

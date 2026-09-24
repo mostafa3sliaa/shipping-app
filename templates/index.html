@@ -99,7 +99,7 @@
             </div>
         </div>
 
-        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-5 g-3 mb-4">
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-6 g-3 mb-4">
             <!-- 1. Total Capital -->
             <div class="col">
                 <div class="card text-white border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #1e3c72, #2a5298) !important;">
@@ -107,7 +107,7 @@
                         <div>
                             <h6 class="fw-bold text-white-50 mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-coins me-1"></i> إجمالي رأس المال</h6>
                             <h3 class="fw-bold text-white mb-0" style="font-size: 1.45rem;">{{ "{:,.2f}".format(total_capital) }} ج.م</h3>
-                            <small class="text-white-50 d-block mt-1" style="font-size: 0.72rem;">(خزينة + محفظة + بضاعة)</small>
+                            <small class="text-white-50 d-block mt-1" style="font-size: 0.72rem;">(خزينة + محفظة + بضاعة - مديونية الشركات)</small>
                         </div>
                         <i class="fa-solid fa-sack-dollar fa-2x text-white opacity-25"></i>
                     </div>
@@ -172,7 +172,33 @@
                 </div>
             </div>
 
-            <!-- 5. Net Collected Profit -->
+            <!-- 5. Total Companies Debt -->
+            <div class="col">
+                <div class="card bg-light border-0 shadow-sm h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center p-3">
+                        <div>
+                            <h6 class="fw-bold text-muted mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-building me-1"></i> مديونية الشركات</h6>
+                            <h3 class="fw-bold {{ 'text-danger' if (total_companies_debt or 0) > 0 else 'text-success' if (total_companies_debt or 0) < 0 else 'text-muted' }} mb-0" style="font-size: 1.45rem;">
+                                {{ "{:,.2f}".format((total_companies_debt or 0)|abs) }} ج.م
+                            </h3>
+                            {% if (total_companies_debt or 0) > 0 %}
+                            <small class="text-danger fw-bold d-block mt-1" style="font-size: 0.72rem;">(علينا للتجار - مخصومة)</small>
+                            {% elif (total_companies_debt or 0) < 0 %}
+                            <small class="text-success fw-bold d-block mt-1" style="font-size: 0.72rem;">(لنا عند الشركات - مضافة)</small>
+                            {% else %}
+                            <small class="text-muted d-block mt-1" style="font-size: 0.72rem;">(الحسابات متزنة وخالصة)</small>
+                            {% endif %}
+                        </div>
+                        <div class="text-end">
+                            <a href="{{ url_for('company_accounting') }}" class="btn btn-sm btn-outline-info fw-bold shadow-sm" style="font-size: 0.72rem; padding: 2px 8px;" title="فتح كشف حساب الشركات">
+                                <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> كشف
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 6. Net Collected Profit -->
             <div class="col">
                 <div class="card bg-dark text-white border-0 shadow-sm h-100" style="background: linear-gradient(45deg, #198754, #20c997) !important;">
                     <div class="card-body d-flex justify-content-between align-items-center p-3">
@@ -279,7 +305,7 @@
                                     {{ "{:+,.2f}".format(tx.amount) }}
                                 </td>
                                 <td>
-                                    <span class="badge bg-{{ 'danger' if tx.tx_type in ['مصروفات', 'سحب_محفظة'] else 'dark' if tx.tx_type == 'تصفير_أرباح' else 'success' }}">
+                                    <span class="badge bg-{{ 'danger' if tx.tx_type in ['مصروفات', 'سحب_محفظة', 'صرف_لشركة'] else 'dark' if tx.tx_type == 'تصفير_أرباح' else 'info' if tx.tx_type == 'تحصيل_من_شركة' else 'success' }}">
                                         {{ tx.tx_type|replace('_', ' ') }}
                                     </span>
                                 </td>

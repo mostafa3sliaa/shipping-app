@@ -58,46 +58,99 @@
             <!-- Wallet Stats -->
             <div class="row mb-5">
                 <div class="col-md-4 mb-3">
-                    <div class="card bg-white border-0 shadow-sm h-100 rounded-4 border-bottom border-5 border-success">
+                    <div class="card bg-white border-0 shadow-sm h-100 rounded-4 border-bottom border-5 border-info">
                         <div class="card-body text-center">
-                            <h6 class="text-muted fw-bold mb-3">إجمالي المستحق للشركة (أوردرات + مديونيات)</h6>
-                            <h3 class="text-success fw-bold mb-2">{{ "{:,.2f}".format(company_debt) }} ج.م</h3>
-                            <div class="d-flex justify-content-center gap-2 mb-3 small fw-bold">
+                            <h6 class="text-muted fw-bold mb-3">إجمالي المستحق للشركة (أوردرات + تسويات)</h6>
+                            <h3 class="text-info fw-bold mb-2">{{ "{:,.2f}".format(company_debt) }} ج.م</h3>
+                            <div class="d-flex justify-content-center flex-wrap gap-2 mb-3 small fw-bold">
                                 <span class="badge bg-light text-dark border"><i class="fa-solid fa-box me-1"></i>أوردرات: {{ "{:,.2f}".format(order_profits) }}</span>
-                                <span class="badge bg-light text-success border"><i class="fa-solid fa-plus-circle me-1"></i>مديونيات: {{ "{:,.2f}".format(manual_debt) }}</span>
+                                <span class="badge bg-light text-success border"><i class="fa-solid fa-plus-circle me-1"></i>علينا: {{ "{:,.2f}".format(manual_debt) }}</span>
+                                {% if manual_deduction > 0 %}
+                                <span class="badge bg-light text-danger border"><i class="fa-solid fa-minus-circle me-1"></i>لينا عندهم: {{ "{:,.2f}".format(manual_deduction) }}</span>
+                                {% endif %}
                             </div>
-                            <button type="button" class="btn btn-outline-success btn-sm mt-2 fw-bold shadow-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#addBalanceModal">
-                                <i class="fa-solid fa-plus"></i> إضافة مديونية (شغل)
+                            <button type="button" class="btn btn-outline-info btn-sm mt-2 fw-bold shadow-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#addBalanceModal">
+                                <i class="fa-solid fa-scale-balanced me-1"></i> تسوية رصيد (لنا / علينا)
                             </button>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4 mb-3">
-                    <div class="card bg-white border-0 shadow-sm h-100 rounded-4 border-bottom border-5 border-danger">
+                    <div class="card bg-white border-0 shadow-sm h-100 rounded-4 border-bottom border-5 border-warning">
                         <div class="card-body text-center">
-                            <h6 class="text-muted fw-bold mb-3">ما تم سداده للشركة</h6>
-                            <h3 class="text-danger fw-bold">{{ "{:,.2f}".format(company_paid) }} ج.م</h3>
+                            <h6 class="text-muted fw-bold mb-3">حركة الدفع والتحصيل للشركة</h6>
+                            <h3 class="{{ 'text-danger' if company_paid >= 0 else 'text-success' }} fw-bold mb-2">{{ "{:,.2f}".format(company_paid) }} ج.م</h3>
+                            <div class="d-flex justify-content-center flex-wrap gap-2 mb-3 small fw-bold">
+                                <span class="badge bg-light text-danger border"><i class="fa-solid fa-arrow-up me-1"></i>سددنا: {{ "{:,.2f}".format(paid_sum_val) }}</span>
+                                {% if received_sum_val > 0 %}
+                                <span class="badge bg-light text-success border"><i class="fa-solid fa-arrow-down me-1"></i>حصلنا منهم: {{ "{:,.2f}".format(received_sum_val) }}</span>
+                                {% endif %}
+                            </div>
                         </div>
                     </div>
                 </div>
                 <div class="col-md-4 mb-3">
-                    <div class="card bg-light border-0 shadow h-100 rounded-4 border-bottom border-5 border-primary">
+                    {% if company_balance > 0 %}
+                    <div class="card bg-white border-0 shadow-sm h-100 rounded-4 border-bottom border-5 border-danger">
                         <div class="card-body text-center position-relative">
-                            <h6 class="text-muted fw-bold mb-3">الرصيد المتبقي للشركة</h6>
-                            <h2 class="text-primary fw-bold">{{ "{:,.2f}".format(company_balance) }} ج.م</h2>
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-1 rounded-pill mb-2 fw-bold">
+                                <i class="fa-solid fa-hand-holding-dollar me-1"></i> مستحق للشركة (علينا)
+                            </span>
+                            <h2 class="text-danger fw-bold my-2">{{ "{:,.2f}".format(company_balance) }} ج.م</h2>
                             
-                            <button type="button" class="btn btn-primary btn-sm mt-2 fw-bold shadow-sm rounded-pill px-4" data-bs-toggle="modal" data-bs-target="#payModal">
-                                <i class="fa-solid fa-hand-holding-dollar me-1"></i> تسجيل دفعة سداد للشركة
-                            </button>
+                            <div class="d-flex justify-content-center gap-2 mt-3">
+                                <button type="button" class="btn btn-danger btn-sm fw-bold shadow-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#payModal">
+                                    <i class="fa-solid fa-hand-holding-dollar me-1"></i> سداد للشركة
+                                </button>
+                                <button type="button" class="btn btn-outline-success btn-sm fw-bold shadow-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#receiveModal">
+                                    <i class="fa-solid fa-arrow-down me-1"></i> تحصيل منهم
+                                </button>
+                            </div>
                         </div>
                     </div>
+                    {% elif company_balance < 0 %}
+                    <div class="card bg-white border-0 shadow-sm h-100 rounded-4 border-bottom border-5 border-success">
+                        <div class="card-body text-center position-relative">
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-1 rounded-pill mb-2 fw-bold">
+                                <i class="fa-solid fa-circle-check me-1"></i> مستحق لنا عند الشركة (لينا عندهم)
+                            </span>
+                            <h2 class="text-success fw-bold my-2">{{ "{:,.2f}".format(company_balance|abs) }} ج.م</h2>
+                            
+                            <div class="d-flex justify-content-center gap-2 mt-3">
+                                <button type="button" class="btn btn-success btn-sm fw-bold shadow-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#receiveModal">
+                                    <i class="fa-solid fa-hand-holding-dollar me-1"></i> تحصيل من الشركة
+                                </button>
+                                <button type="button" class="btn btn-outline-danger btn-sm fw-bold shadow-sm rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#payModal">
+                                    <i class="fa-solid fa-arrow-up me-1"></i> سداد للشركة
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="card bg-light border-0 shadow-sm h-100 rounded-4 border-bottom border-5 border-secondary">
+                        <div class="card-body text-center position-relative">
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-3 py-1 rounded-pill mb-2 fw-bold">
+                                <i class="fa-solid fa-check-double me-1"></i> الحساب متزن وخالص
+                            </span>
+                            <h2 class="text-muted fw-bold my-2">0.00 ج.م</h2>
+                            <div class="d-flex justify-content-center gap-2 mt-3">
+                                <button type="button" class="btn btn-outline-danger btn-sm fw-bold rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#payModal">
+                                    سداد للشركة
+                                </button>
+                                <button type="button" class="btn btn-outline-success btn-sm fw-bold rounded-pill px-3" data-bs-toggle="modal" data-bs-target="#receiveModal">
+                                    تحصيل منهم
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
             
             <!-- Transaction History -->
             <div class="card shadow-sm border-0 mb-5 bg-light">
                 <div class="card-header bg-white fw-bold py-3">
-                    <i class="fa-solid fa-clock-rotate-left me-2 text-warning"></i> سجل المدفوعات السابقة للشركة
+                    <i class="fa-solid fa-clock-rotate-left me-2 text-warning"></i> سجل المعاملات والمدفوعات السابقة للشركة
                 </div>
                 <div class="card-body p-0">
                     <div class="table-responsive" style="max-height: 250px; overflow-y: auto;">
@@ -106,7 +159,8 @@
                                 <tr>
                                     <th>التاريخ</th>
                                     <th>المبلغ</th>
-                                    <th>طريقة الدفع</th>
+                                    <th>نوع الحركة</th>
+                                    <th>الخزينة / المصدر</th>
                                     <th>ملاحظات</th>
                                 </tr>
                             </thead>
@@ -115,16 +169,30 @@
                                 <tr>
                                     <td><small class="text-muted">{{ tx.created_at.strftime('%Y-%m-%d %I:%M %p') }}</small></td>
                                     {% if tx.tx_type == 'إضافة_رصيد_لشركة' %}
-                                    <td class="text-success fw-bold">+ {{ "{:,.2f}".format(tx.amount) }} ج.م</td>
-                                    <td><span class="badge bg-secondary"><i class="fa-solid fa-plus-circle"></i> مديونية مضافة</span></td>
-                                    {% else %}
+                                    <td class="text-warning fw-bold">+ {{ "{:,.2f}".format(tx.amount) }} ج.م</td>
+                                    <td><span class="badge bg-warning text-dark"><i class="fa-solid fa-plus-circle me-1"></i> مديونية علينا للشركة</span></td>
+                                    <td><span class="badge bg-secondary">تسوية رصيد</span></td>
+                                    {% elif tx.tx_type == 'خصم_رصيد_من_شركة' %}
+                                    <td class="text-info fw-bold">- {{ "{:,.2f}".format(tx.amount) }} ج.م</td>
+                                    <td><span class="badge bg-info text-dark"><i class="fa-solid fa-minus-circle me-1"></i> مستحق لنا على الشركة</span></td>
+                                    <td><span class="badge bg-secondary">تسوية رصيد</span></td>
+                                    {% elif tx.tx_type == 'صرف_لشركة' %}
                                     <td class="text-danger fw-bold">- {{ "{:,.2f}".format(tx.amount|abs) }} ج.م</td>
+                                    <td><span class="badge bg-danger"><i class="fa-solid fa-arrow-up me-1"></i> سداد للشركة</span></td>
                                     <td><span class="badge bg-{{ 'success' if tx.method == 'كاش' else 'primary' }}">{{ tx.method }}</span></td>
+                                    {% elif tx.tx_type == 'تحصيل_من_شركة' %}
+                                    <td class="text-success fw-bold">+ {{ "{:,.2f}".format(tx.amount) }} ج.م</td>
+                                    <td><span class="badge bg-success"><i class="fa-solid fa-arrow-down me-1"></i> تحصيل من الشركة</span></td>
+                                    <td><span class="badge bg-{{ 'success' if tx.method == 'كاش' else 'primary' }}">{{ tx.method }}</span></td>
+                                    {% else %}
+                                    <td class="fw-bold">{{ "{:,.2f}".format(tx.amount) }} ج.م</td>
+                                    <td><span class="badge bg-secondary">{{ tx.tx_type }}</span></td>
+                                    <td><span class="badge bg-secondary">{{ tx.method }}</span></td>
                                     {% endif %}
                                     <td>{{ tx.notes or '-' }}</td>
                                 </tr>
                                 {% else %}
-                                <tr><td colspan="4" class="text-center text-muted py-3">لم يتم تسجيل أي حركات للشركة بعد</td></tr>
+                                <tr><td colspan="5" class="text-center text-muted py-3">لم يتم تسجيل أي حركات للشركة بعد</td></tr>
                                 {% endfor %}
                             </tbody>
                         </table>
@@ -238,31 +306,90 @@
                 </div>
             </div>
 
-            <!-- Add Balance Modal -->
-            <div class="modal fade" id="addBalanceModal" tabindex="-1" aria-hidden="true">
+            <!-- Receive Modal (تحصيل من الشركة إلى الخزينة) -->
+            <div class="modal fade" id="receiveModal" tabindex="-1" aria-hidden="true">
                 <div class="modal-dialog">
                     <div class="modal-content text-end">
                         <div class="modal-header bg-success text-white">
-                            <h5 class="modal-title"><i class="fa-solid fa-plus-circle me-2"></i> إضافة مديونية (رصيد للشركة)</h5>
+                            <h5 class="modal-title"><i class="fa-solid fa-hand-holding-dollar me-2"></i> تحصيل من الشركة (إيداع في الخزينة)</h5>
                             <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal" aria-label="Close"></button>
                         </div>
-                        <div class="modal-body bg-light">
-                            <div class="alert alert-info py-2 small mb-4">
-                                <i class="fa-solid fa-circle-info me-1"></i> هذا الخيار يستخدم إذا أعطتك الشركة بضاعة أو شغل خارج الأوردرات المسجلة وتريد إضافة قيمتها كـ <strong>(مديونية عليك)</strong> لتزيد من إجمالي الرصيد المستحق للشركة. هذه العملية <strong>لا تؤثر</strong> على الخزينة كاش أو تحويل.
+                        <div class="modal-body">
+                            <div class="alert alert-success py-2 small mb-3">
+                                <i class="fa-solid fa-circle-info me-1"></i> يستخدم هذا الخيار عند استلام مبالغ نقدية أو تحويل بنكي من الشركة إلى الخزينة (سداد لفلوسك المستحقة عندهم).
                             </div>
-                            <form action="{{ url_for('company_add_balance', company_id=selected_company.id) }}" method="POST">
+                            <form action="{{ url_for('company_receive', company_id=selected_company.id) }}" method="POST">
                                 <div class="mb-3">
-                                    <label class="form-label fw-bold">المبلغ المضاف للمديونية</label>
+                                    <label class="form-label fw-bold">المبلغ المُحصّل</label>
                                     <div class="input-group">
                                         <input type="number" step="0.01" name="amount" class="form-control fw-bold text-success" required>
                                         <span class="input-group-text">ج.م</span>
                                     </div>
                                 </div>
-                                <div class="mb-4">
-                                    <label class="form-label fw-bold">ملاحظات (مثال: بضاعة جديدة، رصيد افتتاحي)</label>
-                                    <input type="text" name="notes" class="form-control" required placeholder="يجب كتابة سبب إضافة هذا الرصيد...">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">طريقة الاستلام (الخزينة المودع بها)</label>
+                                    <select name="method" class="form-select fw-bold">
+                                        <option value="كاش">كاش (في درج الخزينة)</option>
+                                        <option value="تحويل">تحويل (في المحفظة / الحساب البنكي)</option>
+                                    </select>
+                                    <small class="text-muted d-block mt-1">سيتم إضافة هذا المبلغ فوراً إلى رصيد الخزينة المحددة.</small>
                                 </div>
-                                <button type="submit" class="btn btn-success w-100 fw-bold">تأكيد الإضافة لرصيد الشركة</button>
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">ملاحظات (اختياري)</label>
+                                    <input type="text" name="notes" class="form-control" placeholder="رقم التحويل أو أي ملاحظة...">
+                                </div>
+                                <button type="submit" class="btn btn-success w-100 fw-bold">تسجيل التحصيل وإيداعه بالخزينة</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Add/Adjust Balance Modal (تسوية رصيد للشركة: لنا أو علينا) -->
+            <div class="modal fade" id="addBalanceModal" tabindex="-1" aria-hidden="true">
+                <div class="modal-dialog">
+                    <div class="modal-content text-end">
+                        <div class="modal-header bg-info text-white">
+                            <h5 class="modal-title"><i class="fa-solid fa-scale-balanced me-2"></i> تسوية رصيد للشركة (لنا أو علينا)</h5>
+                            <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+                        </div>
+                        <div class="modal-body bg-light">
+                            <div class="alert alert-info py-2 small mb-3">
+                                <i class="fa-solid fa-circle-info me-1"></i> تسويات الأرصدة <strong>لا تخصم ولا تضيف</strong> أموالاً مباشرة للخزينة، بل تعدل الرصيد الدفتري بينك وبين التاجر (مثل شحن مرتجعات، تعويضات، بضاعة جديدة).
+                            </div>
+                            <form action="{{ url_for('company_add_balance', company_id=selected_company.id) }}" method="POST">
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">نوع التسوية:</label>
+                                    <div class="d-flex flex-column gap-2 p-2 bg-white rounded border">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="balance_type" id="balCredit" value="credit_to_company" checked>
+                                            <label class="form-check-label fw-bold text-danger" for="balCredit">
+                                                مديونية علينا للشركة (مستحق للتاجر)
+                                                <small class="text-muted d-block fw-normal">مثل: بضاعة إضافية، شغل خارج الأوردرات</small>
+                                            </label>
+                                        </div>
+                                        <hr class="my-1">
+                                        <div class="form-check">
+                                            <input class="form-check-input" type="radio" name="balance_type" id="balDebit" value="debit_from_company">
+                                            <label class="form-check-label fw-bold text-success" for="balDebit">
+                                                مديونية على الشركة لصالحنا (لينا عندهم فلوس)
+                                                <small class="text-muted d-block fw-normal">مثل: شحن مرتجعات، سلفة للشركة، غرامات/كسر</small>
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-bold">المبلغ</label>
+                                    <div class="input-group">
+                                        <input type="number" step="0.01" name="amount" class="form-control fw-bold" required>
+                                        <span class="input-group-text">ج.م</span>
+                                    </div>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label fw-bold">البيان / ملاحظات (السبب)</label>
+                                    <input type="text" name="notes" class="form-control" required placeholder="مثال: شحن مرتجع، بضاعة جديدة، تسوية...">
+                                </div>
+                                <button type="submit" class="btn btn-info text-white w-100 fw-bold">حفظ التسوية</button>
                             </form>
                         </div>
                     </div>

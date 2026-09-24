@@ -1178,6 +1178,120 @@ def test_courier_settlement_custom_collected_and_fee_deficit(client):
         assert tx is not None
         assert tx.amount == -30.0
 
+def test_company_credit_and_debit_adjustments(client):
+    with app.app_context():
+        comp = Company(name="Merchant XYZ")
+        db.session.add(comp)
+        db.session.commit()
+        comp_id = comp.id
+
+    # 1. Add credit to company (علينا للشركة): 500 EGP
+    res_credit = client.post(f'/api/company/{comp_id}/add_balance', data={
+        'amount': '500',
+        'balance_type': 'credit_to_company',
+        'notes': 'بضاعة إضافية'
+    }, follow_redirects=True)
+    assert res_credit.status_code == 200
+
+    with app.app_context():
+        tx_credit = TreasuryTransaction.query.filter_by(entity_id=comp_id, tx_type='إضافة_رصيد_لشركة').first()
+        assert tx_credit is not None
+        assert tx_credit.amount == 500.0
+
+    # 2. Add debit on company (لنا عندهم فلوس): 200 EGP
+    res_debit = client.post(f'/api/company/{comp_id}/add_balance', data={
+        'amount': '200',
+        'balance_type': 'debit_from_company',
+        'notes': 'شحن مرتجعات مستحق لنا'
+    }, follow_redirects=True)
+    assert res_debit.status_code == 200
+
+    with app.app_context():
+        tx_debit = TreasuryTransaction.query.filter_by(entity_id=comp_id, tx_type='خصم_رصيد_من_شركة').first()
+        assert tx_debit is not None
+        assert tx_debit.amount == 200.0
+
+    # Check company accounting page renders with net balance of 300 (500 - 200)
+    page_res = client.get(f'/accounting/company?company_id={comp_id}')
+    assert page_res.status_code == 200
+    assert '300.00' in page_res.get_data(as_text=True)
+
+def test_company_payout_and_receipt(client):
+    with app.app_context():
+        comp = Company(name="Merchant ABC")
+        db.session.add(comp)
+        db.session.commit()
+        comp_id = comp.id
+
+    # 1. Company owes us money: debit 400 EGP
+    client.post(f'/api/company/{comp_id}/add_balance', data={
+        'amount': '400',
+        'balance_type': 'debit_from_company',
+        'notes': 'مصاريف شحن مرتجعات'
+    })
+
+    # Balance is -400 (مستحق لنا عند الشركة)
+    res_page1 = client.get(f'/accounting/company?company_id={comp_id}')
+    assert 'مستحق لنا عند الشركة' in res_page1.get_data(as_text=True)
+    assert '400.00' in res_page1.get_data(as_text=True)
+
+    # 2. Company pays us 400 EGP cash into our treasury
+    res_receive = client.post(f'/api/company/{comp_id}/receive', data={
+        'amount': '400',
+        'method': 'كاش',
+        'notes': 'سداد كاش من الشركة'
+    }, follow_redirects=True)
+    assert res_receive.status_code == 200
+
+    with app.app_context():
+        tx_rec = TreasuryTransaction.query.filter_by(entity_id=comp_id, tx_type='تحصيل_من_شركة').first()
+        assert tx_rec is not None
+        assert tx_rec.amount == 400.0
+        assert tx_rec.method == 'كاش'
+
+        # Cash treasury increased by 400
+        cash = db.session.query(db.func.sum(TreasuryTransaction.amount)).filter_by(method='كاش').scalar()
+        assert cash == 400.0
+
+    # Balance is now 0 (متزن وخالص)
+    res_page2 = client.get(f'/accounting/company?company_id={comp_id}')
+    assert 'الحساب متزن وخالص' in res_page2.get_data(as_text=True)
+
+def test_company_debt_deducted_from_dashboard_capital(client):
+    with app.app_context():
+        comp = Company(name="Test Capital Co")
+        db.session.add(comp)
+        db.session.commit()
+        comp_id = comp.id
+
+        # Deposit 10,000 cash in treasury
+        db.session.add(TreasuryTransaction(amount=10000.0, method='كاش', tx_type='إيداع_يدوي'))
+        # Create 1 warehouse order worth 2,000 (cod 2050, ship 50 -> net goods 2000)
+        db.session.add(Order(tracking_number='TRK-CAP', company_id=comp_id, cod=2050, shipping_fee=50, status='مخزن'))
+        db.session.commit()
+
+    # Before company debt:
+    # Capital = 10,000 (cash) + 2,000 (goods) = 12,000
+    res1 = client.get('/?tab=dashboard')
+    assert '12,000.00' in res1.get_data(as_text=True)
+
+    # Add company debt of 3,000 (credit to company)
+    client.post(f'/api/company/{comp_id}/add_balance', data={
+        'amount': '3000',
+        'balance_type': 'credit_to_company',
+        'notes': 'مديونية بضاعة'
+    })
+
+    # After company debt:
+    # Total Company Debt = 3,000
+    # Net Capital = 12,000 - 3,000 = 9,000
+    res2 = client.get('/?tab=dashboard')
+    content2 = res2.get_data(as_text=True)
+    assert '9,000.00' in content2
+    assert '3,000.00' in content2
+    assert 'مديونية الشركات' in content2
+
+
 
 
 
