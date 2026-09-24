@@ -533,84 +533,81 @@
 
             <div class="card shadow-sm border-0 mb-5">
                 <div class="card-body p-0">
-                    <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
-                        <table class="table table-sm table-hover table-striped mb-0 align-middle" style="font-size: 0.84rem;">
+                    <div class="table-responsive p-0" style="max-height: 650px; overflow-y: auto;">
+                        <table class="table table-sm table-hover table-striped mb-0 align-middle table-compact-orders">
                             <thead class="table-dark sticky-top small text-nowrap align-middle" style="z-index: 10;">
                                 <tr>
-                                    <th class="py-2 px-1 text-center" style="width: 32px;">
-                                        <input class="form-check-input border-secondary" type="checkbox" id="selectAllHeader" onchange="toggleAllOrders(this)" title="تحديد الكل" style="cursor: pointer;">
+                                    <th class="py-2 px-1 text-center" style="width: 1%; white-space: nowrap;">
+                                        <input class="form-check-input border-secondary m-0" type="checkbox" id="selectAllHeader" onchange="toggleAllOrders(this)" title="تحديد الكل" style="cursor: pointer; width: 1.1em; height: 1.1em;">
                                     </th>
-                                    <th class="py-2 px-1" style="width: 95px;"><i class="fa-solid fa-barcode me-1"></i>البوليصة</th>
-                                    <th class="py-2 px-1" style="width: 80px;"><i class="fa-regular fa-calendar me-1"></i>التاريخ</th>
-                                    <th class="py-2 px-1" style="min-width: 105px;"><i class="fa-solid fa-building me-1"></i>الشركة / المنطقة</th>
-                                    <th class="py-2 px-1" style="min-width: 115px;"><i class="fa-solid fa-user me-1"></i>العميل / الهاتف</th>
-                                    <th class="py-2 px-1"><i class="fa-solid fa-location-dot me-1"></i>العنوان</th>
-                                    <th class="py-2 px-1" style="max-width: 110px;"><i class="fa-solid fa-box me-1"></i>المحتوى</th>
-                                    <th class="py-2 px-1 text-nowrap" style="min-width: 90px;"><i class="fa-solid fa-money-bill-wave me-1"></i>السعر (COD)</th>
-                                    <th class="py-2 px-1 text-center" style="width: 60px;"><i class="fa-solid fa-truck-fast me-1"></i>الشحن</th>
-                                    <th class="py-2 px-1 text-center" style="min-width: 100px;"><i class="fa-solid fa-circle-info me-1"></i>الحالة</th>
-                                    <th class="py-2 px-1 text-center" style="width: 105px;"><i class="fa-solid fa-gear me-1"></i>إجراءات</th>
+                                    <th class="py-2 px-1" style="width: 1%; white-space: nowrap;"><i class="fa-solid fa-barcode me-1"></i>البوليصة</th>
+                                    <th class="py-2 px-1" style="width: 1%; white-space: nowrap;"><i class="fa-regular fa-calendar me-1"></i>التاريخ</th>
+                                    <th class="py-2 px-1" style="width: 9%; min-width: 90px; white-space: nowrap;"><i class="fa-solid fa-building me-1"></i>الشركة/المنطقة</th>
+                                    <th class="py-2 px-1" style="width: 11%; min-width: 100px; white-space: nowrap;"><i class="fa-solid fa-user me-1"></i>العميل/الهاتف</th>
+                                    <th class="py-2 px-1" style="min-width: 130px;"><i class="fa-solid fa-location-dot me-1"></i>العنوان</th>
+                                    <th class="py-2 px-1" style="width: 10%; min-width: 85px;"><i class="fa-solid fa-box me-1"></i>المحتوى</th>
+                                    <th class="py-2 px-1 text-nowrap" style="width: 1%; white-space: nowrap;"><i class="fa-solid fa-money-bill-wave me-1"></i>السعر (COD)</th>
+                                    <th class="py-2 px-1 text-center" style="width: 1%; white-space: nowrap;"><i class="fa-solid fa-truck-fast me-1"></i>الشحن</th>
+                                    <th class="py-2 px-1 text-center" style="width: 1%; white-space: nowrap;"><i class="fa-solid fa-circle-info me-1"></i>الحالة</th>
+                                    <th class="py-2 px-1 text-center" style="width: 1%; white-space: nowrap;"><i class="fa-solid fa-gear me-1"></i>إجراءات</th>
                                 </tr>
                             </thead>
                             <tbody id="orders-tbody">
                                 {% for order in orders %}
                                 <tr id="order-row-{{ order.id }}" class="{% if order.is_copied %}bg-success bg-opacity-25{% elif order.phone in duplicate_phones %}bg-danger bg-opacity-10 border-danger border-2{% else %}bg-white{% endif %}">
-                                    <td class="text-center px-1" style="width: 32px;">
-                                        <input class="form-check-input order-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}" id="checkbox-{{ order.id }}">
+                                    <td class="text-center px-1" style="width: 1%; white-space: nowrap;">
+                                        <input class="form-check-input order-checkbox m-0" type="checkbox" name="order_ids" value="{{ order.id }}" id="checkbox-{{ order.id }}">
                                     </td>
-                                    <td class="px-1 fw-bold text-primary text-nowrap">{{ order.tracking_number }}</td>
-                                    <td class="px-1 text-nowrap">
+                                    <td class="px-1 fw-bold text-primary" style="width: 1%; white-space: nowrap;">{{ order.tracking_number }}</td>
+                                    <td class="px-1 text-nowrap text-muted" style="width: 1%; white-space: nowrap; font-size: 0.74rem;">
                                         {% if order.created_at %}
-                                        <small class="text-muted">{{ order.created_at.strftime('%Y-%m-%d') }}</small>
+                                        {{ order.created_at.strftime('%Y-%m-%d') }}
                                         {% endif %}
                                     </td>
-                                    <td class="px-1" style="min-width: 105px;">
-                                        <span class="badge bg-info text-dark d-block mb-1 text-truncate" style="max-width: 120px;" title="{{ order.company.name if order.company else '-' }}">{{ order.company.name if order.company else '-' }}</span>
+                                    <td class="px-1" style="width: 9%; min-width: 90px;">
+                                        <span class="badge bg-info text-dark d-block mb-1 text-truncate" style="max-width: 105px;" title="{{ order.company.name if order.company else '-' }}">{{ order.company.name if order.company else '-' }}</span>
                                         {% if order.region %}
-                                        <span class="badge d-block text-dark border border-secondary text-truncate" style="max-width: 120px; background-color: {{ order.region|string_color }};" title="{{ order.region }}">
+                                        <span class="badge d-block text-dark border border-secondary text-truncate" style="max-width: 105px; background-color: {{ order.region|string_color }};" title="{{ order.region }}">
                                             <i class="fa-solid fa-map-pin me-1 opacity-75"></i> {{ order.region }}
                                         </span>
                                         {% endif %}
                                     </td>
-                                    <td class="px-1" style="min-width: 115px;">
-                                        <div class="fw-bold text-truncate" style="max-width: 130px;" title="{{ order.client_name }}">{{ order.client_name }}</div>
-                                        <small class="{% if order.phone in duplicate_phones %}text-danger fw-bold{% else %}text-muted{% endif %} text-nowrap">
-                                            <i class="fa-solid fa-phone fa-sm"></i> {{ order.phone }}
+                                    <td class="px-1" style="width: 11%; min-width: 100px;">
+                                        <div class="fw-bold text-truncate" style="max-width: 110px;" title="{{ order.client_name }}">{{ order.client_name }}</div>
+                                        <small class="{% if order.phone in duplicate_phones %}text-danger fw-bold{% else %}text-muted{% endif %} text-nowrap" style="font-size: 0.74rem;">
+                                            <i class="fa-solid fa-phone fa-xs"></i> {{ order.phone }}
                                             {% if order.phone in duplicate_phones %}<i class="fa-solid fa-triangle-exclamation ms-1" title="رقم مكرر"></i>{% endif %}
                                         </small>
                                     </td>
                                     <td class="px-1">
-                                        <div class="text-wrap" style="max-width: 175px; font-size: 0.8rem; line-height: 1.25;">{{ order.address }}</div>
+                                        <div class="order-cell-address" title="{{ order.address }}">{{ order.address }}</div>
                                     </td>
-                                    <td class="px-1">
-                                        <div class="text-wrap text-muted" style="max-width: 105px; font-size: 0.76rem; line-height: 1.2;">
+                                    <td class="px-1" style="width: 10%; min-width: 85px;">
+                                        <div class="order-cell-content text-muted" title="{{ order.content if order.content else '-' }}">
                                             {{ order.content if order.content else '-' }}
                                         </div>
                                     </td>
-                                    <td class="px-1 fw-bold text-success text-nowrap" style="min-width: 90px;">
+                                    <td class="px-1 fw-bold text-success text-nowrap" style="width: 1%; white-space: nowrap;">
                                         <div>{{ "{:,.2f}".format(order.cod) }}</div>
                                         {% if order.status == 'تسليم جزئي / مرتجع' and order.collected_amount is not none and order.collected_amount < order.cod %}
-                                        <div class="mt-1 p-1 rounded bg-light border shadow-sm" style="font-size: 0.68rem; line-height: 1.25; text-align: start;">
+                                        <div class="mt-1 p-1 rounded bg-light border shadow-sm" style="font-size: 0.66rem; line-height: 1.2; text-align: start;">
                                             <div class="text-success fw-bold" title="قيمة البضاعة المباعة والمسلمة للعميل (المحصل - الشحن)">
                                                 <i class="fa-solid fa-check-circle me-1"></i>المُسلّم: <span>{{ "{:,.2f}".format(order.collected_amount - (order.shipping_fee or 0.0)) }} ج.م</span>
-                                                <small class="text-muted d-block" style="font-size: 0.62rem;">(كاش للشركة)</small>
                                             </div>
                                             <div class="text-danger fw-bold mt-1 pt-1 border-top" title="قيمة البضاعة التي رفضها العميل وعادت للمخزن">
                                                 <i class="fa-solid fa-rotate-left me-1"></i>المرتجع: <span>{{ "{:,.2f}".format(order.cod - order.collected_amount) }} ج.م</span>
-                                                <small class="text-muted d-block" style="font-size: 0.62rem;">(بضاعة راجعة المخزن)</small>
                                             </div>
                                         </div>
                                         {% elif order.collected_amount is not none and (order.status == 'مرتجع شركة' and order.collected_amount > 0) and order.collected_amount < order.cod %}
                                         <div class="mt-1">
-                                            <span class="badge bg-warning text-dark border border-secondary" style="font-size: 0.7rem; font-weight: bold;" title="صافي قيمة البضاعة المسلمة للشركة بعد خصم المرتجع والشحن">
+                                            <span class="badge bg-warning text-dark border border-secondary" style="font-size: 0.68rem; font-weight: bold;" title="صافي قيمة البضاعة المسلمة للشركة بعد خصم المرتجع والشحن">
                                                 {{ "{:,.2f}".format(order.collected_amount - (order.shipping_fee or 0.0)) }} ج.م
                                             </span>
-                                            <small class="text-muted d-block" style="font-size: 0.62rem;">(للشركة)</small>
                                         </div>
                                         {% endif %}
                                     </td>
-                                    <td class="px-1 text-center text-muted text-nowrap" style="width: 60px;">{{ order.shipping_fee }}</td>
-                                    <td class="px-1 text-center" style="min-width: 100px;">
+                                    <td class="px-1 text-center text-muted text-nowrap" style="width: 1%; white-space: nowrap;">{{ order.shipping_fee }}</td>
+                                    <td class="px-1 text-center text-nowrap" style="width: 1%; white-space: nowrap;">
                                         {% if order.status == 'مخزن' or order.status == 'جديد بالمخزن' %}
                                             <span class="badge bg-primary">مخزن</span>
                                         {% elif order.status == 'مع المندوب' or order.status == 'قيد التوصيل' %}
@@ -624,20 +621,20 @@
                                         {% elif order.status == 'مرتجع' %}
                                             <span class="badge bg-danger">مرتجع</span>
                                             {% if order.collected_amount is not none and order.collected_amount > 0 and (order.cod is none or order.collected_amount < order.cod) %}
-                                            <small class="text-success d-block fw-bold mt-1" style="font-size: 0.68rem;" title="تم تحصيل مصاريف الشحن من العميل بواسطة المندوب"><i class="fa-solid fa-coins me-1"></i>بتحصيل شحن: {{ "{:,.0f}".format(order.collected_amount) }}</small>
+                                            <small class="text-success d-block fw-bold mt-1" style="font-size: 0.66rem;" title="تم تحصيل مصاريف الشحن من العميل بواسطة المندوب"><i class="fa-solid fa-coins me-1"></i>بتحصيل شحن: {{ "{:,.0f}".format(order.collected_amount) }}</small>
                                             {% endif %}
                                         {% elif order.status == 'مرتجع شركة' %}
                                             <span class="badge bg-dark">مرتجع شركة</span>
                                             {% if order.collected_amount is not none and order.collected_amount > 0 and (order.cod is none or order.collected_amount < order.cod) %}
-                                            <small class="text-success d-block fw-bold mt-1" style="font-size: 0.68rem;" title="تم تحصيل مصاريف الشحن من العميل"><i class="fa-solid fa-coins me-1"></i>بتحصيل شحن: {{ "{:,.0f}".format(order.collected_amount) }}</small>
+                                            <small class="text-success d-block fw-bold mt-1" style="font-size: 0.66rem;" title="تم تحصيل مصاريف الشحن من العميل"><i class="fa-solid fa-coins me-1"></i>بتحصيل شحن: {{ "{:,.0f}".format(order.collected_amount) }}</small>
                                             {% endif %}
                                         {% else %}
                                             <span class="badge bg-dark">{{ order.status }}</span>
                                         {% endif %}
                                     </td>
-                                    <td class="px-1 text-center text-nowrap" style="width: 105px;">
+                                    <td class="px-1 text-center text-nowrap" style="width: 1%; white-space: nowrap;">
                                         <div class="d-inline-flex gap-1 align-items-center justify-content-center">
-                                            <button type="button" class="btn btn-sm {% if order.is_copied %}btn-dark{% else %}btn-success{% endif %} rounded-circle" style="width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="نسخ للمندوب" onclick="copyOrderDetails({{ order.id }}, this)"
+                                            <button type="button" class="btn btn-sm {% if order.is_copied %}btn-dark{% else %}btn-success{% endif %} rounded-circle btn-circle-action" title="نسخ للمندوب" onclick="copyOrderDetails({{ order.id }}, this)"
                                                     data-client="{{ order.client_name }}" 
                                                     data-phone="{{ order.phone }}"
                                                     data-address="{{ order.address }}"
@@ -646,14 +643,13 @@
                                                     data-company="{{ order.company.name if order.company else '' }}">
                                                 {% if order.is_copied %}<i class="fa-solid fa-check"></i>{% else %}<i class="fa-brands fa-whatsapp"></i>{% endif %}
                                             </button>
-                                            <button type="button" class="btn btn-sm btn-primary rounded-circle" style="width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="تعديل" onclick="openEditModal({{ order.id }})">
+                                            <button type="button" class="btn btn-sm btn-primary rounded-circle btn-circle-action" title="تعديل" onclick="openEditModal({{ order.id }})">
                                                 <i class="fa-solid fa-pen"></i>
                                             </button>
-                                            <button type="button" class="btn btn-sm btn-danger rounded-circle" style="width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="مسح" onclick="deleteSingleOrder({{ order.id }})">
+                                            <button type="button" class="btn btn-sm btn-danger rounded-circle btn-circle-action" title="مسح" onclick="deleteSingleOrder({{ order.id }})">
                                                 <i class="fa-solid fa-trash"></i>
                                             </button>
                                         </div>
-                                    </td>
                                 </tr>
                                 {% else %}
                                 <tr>
@@ -1219,7 +1215,7 @@
         
         const actionsHtml = `
             <div class="d-inline-flex gap-1 align-items-center justify-content-center">
-                <button type="button" class="btn btn-sm ${order.is_copied ? 'btn-dark' : 'btn-success'} rounded-circle" style="width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="نسخ للمندوب" onclick="copyOrderDetails(${order.id}, this)"
+                <button type="button" class="btn btn-sm ${order.is_copied ? 'btn-dark' : 'btn-success'} rounded-circle btn-circle-action" title="نسخ للمندوب" onclick="copyOrderDetails(${order.id}, this)"
                         data-client="${safeClient}" 
                         data-phone="${order.phone || ''}"
                         data-address="${safeAddress}"
@@ -1228,39 +1224,39 @@
                         data-company="${safeCompany}">
                     ${order.is_copied ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-brands fa-whatsapp"></i>'}
                 </button>
-                <button type="button" class="btn btn-sm btn-primary rounded-circle" style="width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="تعديل" onclick="openEditModal(${order.id})">
+                <button type="button" class="btn btn-sm btn-primary rounded-circle btn-circle-action" title="تعديل" onclick="openEditModal(${order.id})">
                     <i class="fa-solid fa-pen"></i>
                 </button>
-                <button type="button" class="btn btn-sm btn-danger rounded-circle" style="width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="مسح" onclick="deleteSingleOrder(${order.id})">
+                <button type="button" class="btn btn-sm btn-danger rounded-circle btn-circle-action" title="مسح" onclick="deleteSingleOrder(${order.id})">
                     <i class="fa-solid fa-trash"></i>
                 </button>
             </div>
         `;
 
         tr.innerHTML = `
-            <td class="text-center px-1" style="width: 32px;">
-                <input class="form-check-input order-checkbox" type="checkbox" name="order_ids" value="${order.id}" id="checkbox-${order.id}">
+            <td class="text-center px-1" style="width: 1%; white-space: nowrap;">
+                <input class="form-check-input order-checkbox m-0" type="checkbox" name="order_ids" value="${order.id}" id="checkbox-${order.id}">
             </td>
-            <td class="px-1 fw-bold text-primary text-nowrap">${order.tracking_number}</td>
-            <td class="px-1 text-nowrap">
-                <small class="text-muted">${order.created_at || '-'}</small>
-                <span class="badge bg-warning text-dark d-block mt-1" style="font-size: 0.65rem;"><i class="fa-solid fa-bolt"></i> باركود</span>
+            <td class="px-1 fw-bold text-primary" style="width: 1%; white-space: nowrap;">${order.tracking_number}</td>
+            <td class="px-1 text-muted" style="width: 1%; white-space: nowrap; font-size: 0.74rem;">
+                ${order.created_at || '-'}
+                <span class="badge bg-warning text-dark d-block mt-1" style="font-size: 0.62rem; padding: 0.15em 0.4em;"><i class="fa-solid fa-bolt"></i> باركود</span>
             </td>
-            <td class="px-1" style="min-width: 105px;">${companyRegionHtml}</td>
-            <td class="px-1" style="min-width: 115px;">
-                <div class="fw-bold text-truncate" style="max-width: 130px;" title="${order.client_name || '-'}">${order.client_name || '-'}</div>
-                <small class="text-muted text-nowrap"><i class="fa-solid fa-phone fa-sm"></i> ${order.phone || '-'}</small>
-            </td>
-            <td class="px-1">
-                <div class="text-wrap" style="max-width: 175px; font-size: 0.8rem; line-height: 1.25;">${order.address || '-'}</div>
+            <td class="px-1" style="width: 9%; min-width: 90px;">${companyRegionHtml}</td>
+            <td class="px-1" style="width: 11%; min-width: 100px;">
+                <div class="fw-bold text-truncate" style="max-width: 110px;" title="${order.client_name || '-'}">${order.client_name || '-'}</div>
+                <small class="text-muted text-nowrap" style="font-size: 0.74rem;"><i class="fa-solid fa-phone fa-xs"></i> ${order.phone || '-'}</small>
             </td>
             <td class="px-1">
-                <div class="text-wrap text-muted" style="max-width: 105px; font-size: 0.76rem; line-height: 1.2;">${order.content || '-'}</div>
+                <div class="order-cell-address" title="${safeAddress}">${order.address || '-'}</div>
             </td>
-            <td class="px-1 fw-bold text-success text-nowrap" style="min-width: 90px;">${codHtml}</td>
-            <td class="px-1 text-center text-muted text-nowrap" style="width: 60px;">${order.shipping_fee != null ? order.shipping_fee : '-'}</td>
-            <td class="px-1 text-center" style="min-width: 100px;">${statusBadge}</td>
-            <td class="px-1 text-center text-nowrap" style="width: 105px;">${actionsHtml}</td>
+            <td class="px-1" style="width: 10%; min-width: 85px;">
+                <div class="order-cell-content text-muted" title="${safeContent}">${order.content || '-'}</div>
+            </td>
+            <td class="px-1 fw-bold text-success text-nowrap" style="width: 1%; white-space: nowrap;">${codHtml}</td>
+            <td class="px-1 text-center text-muted text-nowrap" style="width: 1%; white-space: nowrap;">${order.shipping_fee != null ? order.shipping_fee : '-'}</td>
+            <td class="px-1 text-center text-nowrap" style="width: 1%; white-space: nowrap;">${statusBadge}</td>
+            <td class="px-1 text-center text-nowrap" style="width: 1%; white-space: nowrap;">${actionsHtml}</td>
         `;
         return tr;
     }
