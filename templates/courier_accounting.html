@@ -112,7 +112,7 @@
                                     </td>
                                     <td>
                                         <div class="input-group input-group-sm">
-                                            <input type="number" step="0.01" name="collected_{{ order.id }}" id="collected_{{ order.id }}" class="form-control text-success fw-bold" value="{{ order.collected_amount if order.collected_amount is not none else '0' }}" oninput="updateTotals()">
+                                            <input type="number" step="0.01" name="collected_{{ order.id }}" id="collected_{{ order.id }}" class="form-control text-success fw-bold" value="{{ order.collected_amount if (order.collected_amount is not none and order.collected_amount > 0) else (order.cod if order.status in ['تم التوصيل', 'مع المندوب'] else '0') }}" oninput="updateTotals()">
                                         </div>
                                     </td>
                                     <td>
@@ -209,13 +209,19 @@
                             row.classList.remove('table-success', 'table-warning', 'table-danger', 'table-info');
                             row.classList.add('bg-light');
                         } else if (status === 'تم التوصيل') {
-                            if (statusChanged && (collectedInput.value == "0" || collectedInput.value == "")) collectedInput.value = cod;
+                            const curVal = parseFloat(collectedInput.value);
+                            if ((statusChanged || isNaN(curVal) || curVal === 0) && cod > 0) {
+                                collectedInput.value = cod;
+                            }
                             collectedInput.readOnly = false;
                             feeInput.readOnly = false;
                             row.classList.remove('bg-light', 'table-warning', 'table-danger', 'table-info');
                             row.classList.add('table-success');
                         } else if (status === 'تسليم جزئي / مرتجع') {
-                            if (statusChanged && (collectedInput.value == "0" || collectedInput.value == "")) collectedInput.value = cod;
+                            const curVal = parseFloat(collectedInput.value);
+                            if ((statusChanged || isNaN(curVal) || curVal === 0) && cod > 0) {
+                                collectedInput.value = cod;
+                            }
                             collectedInput.readOnly = false;
                             feeInput.readOnly = false;
                             row.classList.remove('bg-light', 'table-success', 'table-danger', 'table-info');

@@ -832,7 +832,9 @@ def new_order():
         shipping_fee=shipping_fee,
         status=status,
         company_id=company_id,
-        courier_id=courier_id
+        courier_id=courier_id,
+        collected_amount=cod,
+        courier_fee=0.0
     )
     db.session.add(order)
     db.session.commit()
