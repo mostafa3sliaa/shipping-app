@@ -99,7 +99,7 @@
             </div>
         </div>
 
-        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 row-cols-xl-6 g-3 mb-4">
+        <div class="row row-cols-1 row-cols-sm-2 row-cols-md-3 g-3 mb-4">
             <!-- 1. Total Capital -->
             <div class="col">
                 <div class="card text-white border-0 shadow-sm h-100" style="background: linear-gradient(135deg, #1e3c72, #2a5298) !important;">
@@ -132,47 +132,7 @@
                 </div>
             </div>
 
-            <!-- 3. Cash Treasury -->
-            <div class="col">
-                <div class="card bg-light border-0 shadow-sm h-100">
-                    <div class="card-body d-flex justify-content-between align-items-center p-3">
-                        <div>
-                            <h6 class="fw-bold text-muted mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-vault me-1"></i> الخزينة (كاش)</h6>
-                            <h3 class="fw-bold text-success mb-0" style="font-size: 1.45rem;">{{ "{:,.2f}".format(treasury_cash) }} ج.م</h3>
-                        </div>
-                        <div class="text-end" style="min-width: 85px;">
-                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold d-block mb-1 w-100" style="font-size: 0.72rem; padding: 2px 6px;" data-bs-toggle="modal" data-bs-target="#expenseModal">
-                                <i class="fa-solid fa-minus me-1"></i> مصروفات
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-success fw-bold d-block w-100" style="font-size: 0.72rem; padding: 2px 6px;" data-bs-toggle="modal" data-bs-target="#depositModal" onclick="document.getElementById('depositMethod').value='كاش'; document.getElementById('depositMethodDisplay').value='كاش (في الخزينة)';">
-                                <i class="fa-solid fa-plus me-1"></i> إيداع
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 4. Transfer Wallet -->
-            <div class="col">
-                <div class="card bg-light border-0 shadow-sm h-100">
-                    <div class="card-body d-flex justify-content-between align-items-center p-3">
-                        <div>
-                            <h6 class="fw-bold text-muted mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-building-columns me-1"></i> المحفظة (تحويل)</h6>
-                            <h3 class="fw-bold text-primary mb-0" style="font-size: 1.45rem;">{{ "{:,.2f}".format(treasury_transfer) }} ج.م</h3>
-                        </div>
-                        <div class="text-end" style="min-width: 85px;">
-                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold d-block mb-1 w-100" style="font-size: 0.72rem; padding: 2px 6px;" data-bs-toggle="modal" data-bs-target="#walletWithdrawModal">
-                                <i class="fa-solid fa-minus me-1"></i> سحب
-                            </button>
-                            <button type="button" class="btn btn-sm btn-outline-primary fw-bold d-block w-100" style="font-size: 0.72rem; padding: 2px 6px;" data-bs-toggle="modal" data-bs-target="#depositModal" onclick="document.getElementById('depositMethod').value='تحويل'; document.getElementById('depositMethodDisplay').value='تحويل (في المحفظة)';">
-                                <i class="fa-solid fa-plus me-1"></i> إيداع
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 5. Total Companies Debt -->
+            <!-- 3. Total Companies Debt -->
             <div class="col">
                 <div class="card bg-light border-0 shadow-sm h-100">
                     <div class="card-body d-flex justify-content-between align-items-center p-3">
@@ -193,6 +153,46 @@
                             <a href="{{ url_for('company_accounting') }}" class="btn btn-sm btn-outline-info fw-bold shadow-sm" style="font-size: 0.72rem; padding: 2px 8px;" title="فتح كشف حساب الشركات">
                                 <i class="fa-solid fa-arrow-up-right-from-square me-1"></i> كشف
                             </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 4. Cash Treasury -->
+            <div class="col">
+                <div class="card bg-light border-0 shadow-sm h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center p-3">
+                        <div>
+                            <h6 class="fw-bold text-muted mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-vault me-1"></i> الخزينة (كاش)</h6>
+                            <h3 class="fw-bold text-success mb-0" style="font-size: 1.45rem;">{{ "{:,.2f}".format(treasury_cash) }} ج.م</h3>
+                        </div>
+                        <div class="text-end" style="min-width: 85px;">
+                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold d-block mb-1 w-100" style="font-size: 0.72rem; padding: 2px 6px;" data-bs-toggle="modal" data-bs-target="#expenseModal">
+                                <i class="fa-solid fa-minus me-1"></i> مصروفات
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-success fw-bold d-block w-100" style="font-size: 0.72rem; padding: 2px 6px;" data-bs-toggle="modal" data-bs-target="#depositModal" onclick="document.getElementById('depositMethod').value='كاش'; document.getElementById('depositMethodDisplay').value='كاش (في الخزينة)';">
+                                <i class="fa-solid fa-plus me-1"></i> إيداع
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Transfer Wallet -->
+            <div class="col">
+                <div class="card bg-light border-0 shadow-sm h-100">
+                    <div class="card-body d-flex justify-content-between align-items-center p-3">
+                        <div>
+                            <h6 class="fw-bold text-muted mb-1" style="font-size: 0.85rem;"><i class="fa-solid fa-building-columns me-1"></i> المحفظة (تحويل)</h6>
+                            <h3 class="fw-bold text-primary mb-0" style="font-size: 1.45rem;">{{ "{:,.2f}".format(treasury_transfer) }} ج.م</h3>
+                        </div>
+                        <div class="text-end" style="min-width: 85px;">
+                            <button type="button" class="btn btn-sm btn-outline-danger fw-bold d-block mb-1 w-100" style="font-size: 0.72rem; padding: 2px 6px;" data-bs-toggle="modal" data-bs-target="#walletWithdrawModal">
+                                <i class="fa-solid fa-minus me-1"></i> سحب
+                            </button>
+                            <button type="button" class="btn btn-sm btn-outline-primary fw-bold d-block w-100" style="font-size: 0.72rem; padding: 2px 6px;" data-bs-toggle="modal" data-bs-target="#depositModal" onclick="document.getElementById('depositMethod').value='تحويل'; document.getElementById('depositMethodDisplay').value='تحويل (في المحفظة)';">
+                                <i class="fa-solid fa-plus me-1"></i> إيداع
+                            </button>
                         </div>
                     </div>
                 </div>
