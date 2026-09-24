@@ -534,66 +534,83 @@
             <div class="card shadow-sm border-0 mb-5">
                 <div class="card-body p-0">
                     <div class="table-responsive" style="max-height: 600px; overflow-y: auto;">
-                        <table class="table table-hover table-striped mb-0 align-middle">
+                        <table class="table table-sm table-hover table-striped mb-0 align-middle" style="font-size: 0.84rem;">
+                            <thead class="table-dark sticky-top small text-nowrap align-middle" style="z-index: 10;">
+                                <tr>
+                                    <th class="py-2 px-1 text-center" style="width: 32px;">
+                                        <input class="form-check-input border-secondary" type="checkbox" id="selectAllHeader" onchange="toggleAllOrders(this)" title="تحديد الكل" style="cursor: pointer;">
+                                    </th>
+                                    <th class="py-2 px-1" style="width: 95px;"><i class="fa-solid fa-barcode me-1"></i>البوليصة</th>
+                                    <th class="py-2 px-1" style="width: 80px;"><i class="fa-regular fa-calendar me-1"></i>التاريخ</th>
+                                    <th class="py-2 px-1" style="min-width: 105px;"><i class="fa-solid fa-building me-1"></i>الشركة / المنطقة</th>
+                                    <th class="py-2 px-1" style="min-width: 115px;"><i class="fa-solid fa-user me-1"></i>العميل / الهاتف</th>
+                                    <th class="py-2 px-1"><i class="fa-solid fa-location-dot me-1"></i>العنوان</th>
+                                    <th class="py-2 px-1" style="max-width: 110px;"><i class="fa-solid fa-box me-1"></i>المحتوى</th>
+                                    <th class="py-2 px-1 text-nowrap" style="min-width: 90px;"><i class="fa-solid fa-money-bill-wave me-1"></i>السعر (COD)</th>
+                                    <th class="py-2 px-1 text-center" style="width: 60px;"><i class="fa-solid fa-truck-fast me-1"></i>الشحن</th>
+                                    <th class="py-2 px-1 text-center" style="min-width: 100px;"><i class="fa-solid fa-circle-info me-1"></i>الحالة</th>
+                                    <th class="py-2 px-1 text-center" style="width: 105px;"><i class="fa-solid fa-gear me-1"></i>إجراءات</th>
+                                </tr>
+                            </thead>
                             <tbody id="orders-tbody">
                                 {% for order in orders %}
                                 <tr id="order-row-{{ order.id }}" class="{% if order.is_copied %}bg-success bg-opacity-25{% elif order.phone in duplicate_phones %}bg-danger bg-opacity-10 border-danger border-2{% else %}bg-white{% endif %}">
-                                    <td class="px-3">
+                                    <td class="text-center px-1" style="width: 32px;">
                                         <input class="form-check-input order-checkbox" type="checkbox" name="order_ids" value="{{ order.id }}" id="checkbox-{{ order.id }}">
                                     </td>
-                                    <td class="px-2 fw-bold text-primary">{{ order.tracking_number }}</td>
-                                    <td>
+                                    <td class="px-1 fw-bold text-primary text-nowrap">{{ order.tracking_number }}</td>
+                                    <td class="px-1 text-nowrap">
                                         {% if order.created_at %}
                                         <small class="text-muted">{{ order.created_at.strftime('%Y-%m-%d') }}</small>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        <span class="badge bg-info text-dark d-block mb-1">{{ order.company.name if order.company else '-' }}</span>
+                                    <td class="px-1" style="min-width: 105px;">
+                                        <span class="badge bg-info text-dark d-block mb-1 text-truncate" style="max-width: 120px;" title="{{ order.company.name if order.company else '-' }}">{{ order.company.name if order.company else '-' }}</span>
                                         {% if order.region %}
-                                        <span class="badge d-block text-dark border border-secondary" style="background-color: {{ order.region|string_color }};">
+                                        <span class="badge d-block text-dark border border-secondary text-truncate" style="max-width: 120px; background-color: {{ order.region|string_color }};" title="{{ order.region }}">
                                             <i class="fa-solid fa-map-pin me-1 opacity-75"></i> {{ order.region }}
                                         </span>
                                         {% endif %}
                                     </td>
-                                    <td>
-                                        <div class="fw-bold">{{ order.client_name }}</div>
-                                        <small class="{% if order.phone in duplicate_phones %}text-danger fw-bold{% else %}text-muted{% endif %}">
+                                    <td class="px-1" style="min-width: 115px;">
+                                        <div class="fw-bold text-truncate" style="max-width: 130px;" title="{{ order.client_name }}">{{ order.client_name }}</div>
+                                        <small class="{% if order.phone in duplicate_phones %}text-danger fw-bold{% else %}text-muted{% endif %} text-nowrap">
                                             <i class="fa-solid fa-phone fa-sm"></i> {{ order.phone }}
                                             {% if order.phone in duplicate_phones %}<i class="fa-solid fa-triangle-exclamation ms-1" title="رقم مكرر"></i>{% endif %}
                                         </small>
                                     </td>
-                                    <td>
-                                        <div class="text-wrap" style="max-width: 250px; font-size: 0.9rem;">{{ order.address }}</div>
+                                    <td class="px-1">
+                                        <div class="text-wrap" style="max-width: 175px; font-size: 0.8rem; line-height: 1.25;">{{ order.address }}</div>
                                     </td>
-                                    <td>
-                                        <div class="text-wrap text-muted" style="max-width: 150px; font-size: 0.8rem;">
+                                    <td class="px-1">
+                                        <div class="text-wrap text-muted" style="max-width: 105px; font-size: 0.76rem; line-height: 1.2;">
                                             {{ order.content if order.content else '-' }}
                                         </div>
                                     </td>
-                                    <td class="fw-bold text-success">
+                                    <td class="px-1 fw-bold text-success text-nowrap" style="min-width: 90px;">
                                         <div>{{ "{:,.2f}".format(order.cod) }}</div>
                                         {% if order.status == 'تسليم جزئي / مرتجع' and order.collected_amount is not none and order.collected_amount < order.cod %}
-                                        <div class="mt-1 p-1 rounded bg-light border shadow-sm" style="font-size: 0.72rem; line-height: 1.4; text-align: start; min-width: 140px;">
+                                        <div class="mt-1 p-1 rounded bg-light border shadow-sm" style="font-size: 0.68rem; line-height: 1.25; text-align: start;">
                                             <div class="text-success fw-bold" title="قيمة البضاعة المباعة والمسلمة للعميل (المحصل - الشحن)">
                                                 <i class="fa-solid fa-check-circle me-1"></i>المُسلّم: <span>{{ "{:,.2f}".format(order.collected_amount - (order.shipping_fee or 0.0)) }} ج.م</span>
-                                                <small class="text-muted d-block" style="font-size: 0.65rem;">(كاش للشركة)</small>
+                                                <small class="text-muted d-block" style="font-size: 0.62rem;">(كاش للشركة)</small>
                                             </div>
                                             <div class="text-danger fw-bold mt-1 pt-1 border-top" title="قيمة البضاعة التي رفضها العميل وعادت للمخزن">
                                                 <i class="fa-solid fa-rotate-left me-1"></i>المرتجع: <span>{{ "{:,.2f}".format(order.cod - order.collected_amount) }} ج.م</span>
-                                                <small class="text-muted d-block" style="font-size: 0.65rem;">(بضاعة راجعة المخزن)</small>
+                                                <small class="text-muted d-block" style="font-size: 0.62rem;">(بضاعة راجعة المخزن)</small>
                                             </div>
                                         </div>
                                         {% elif order.collected_amount is not none and (order.status == 'مرتجع شركة' and order.collected_amount > 0) and order.collected_amount < order.cod %}
                                         <div class="mt-1">
-                                            <span class="badge bg-warning text-dark border border-secondary" style="font-size: 0.75rem; font-weight: bold;" title="صافي قيمة البضاعة المسلمة للشركة بعد خصم المرتجع والشحن">
+                                            <span class="badge bg-warning text-dark border border-secondary" style="font-size: 0.7rem; font-weight: bold;" title="صافي قيمة البضاعة المسلمة للشركة بعد خصم المرتجع والشحن">
                                                 {{ "{:,.2f}".format(order.collected_amount - (order.shipping_fee or 0.0)) }} ج.م
                                             </span>
-                                            <small class="text-muted d-block" style="font-size: 0.68rem;">(للشركة)</small>
+                                            <small class="text-muted d-block" style="font-size: 0.62rem;">(للشركة)</small>
                                         </div>
                                         {% endif %}
                                     </td>
-                                    <td class="text-muted">{{ order.shipping_fee }}</td>
-                                    <td>
+                                    <td class="px-1 text-center text-muted text-nowrap" style="width: 60px;">{{ order.shipping_fee }}</td>
+                                    <td class="px-1 text-center" style="min-width: 100px;">
                                         {% if order.status == 'مخزن' or order.status == 'جديد بالمخزن' %}
                                             <span class="badge bg-primary">مخزن</span>
                                         {% elif order.status == 'مع المندوب' or order.status == 'قيد التوصيل' %}
@@ -607,38 +624,40 @@
                                         {% elif order.status == 'مرتجع' %}
                                             <span class="badge bg-danger">مرتجع</span>
                                             {% if order.collected_amount is not none and order.collected_amount > 0 and (order.cod is none or order.collected_amount < order.cod) %}
-                                            <small class="text-success d-block fw-bold mt-1" style="font-size: 0.72rem;" title="تم تحصيل مصاريف الشحن من العميل بواسطة المندوب"><i class="fa-solid fa-coins me-1"></i>بتحصيل شحن: {{ "{:,.0f}".format(order.collected_amount) }}</small>
+                                            <small class="text-success d-block fw-bold mt-1" style="font-size: 0.68rem;" title="تم تحصيل مصاريف الشحن من العميل بواسطة المندوب"><i class="fa-solid fa-coins me-1"></i>بتحصيل شحن: {{ "{:,.0f}".format(order.collected_amount) }}</small>
                                             {% endif %}
                                         {% elif order.status == 'مرتجع شركة' %}
                                             <span class="badge bg-dark">مرتجع شركة</span>
                                             {% if order.collected_amount is not none and order.collected_amount > 0 and (order.cod is none or order.collected_amount < order.cod) %}
-                                            <small class="text-success d-block fw-bold mt-1" style="font-size: 0.72rem;" title="تم تحصيل مصاريف الشحن من العميل"><i class="fa-solid fa-coins me-1"></i>بتحصيل شحن: {{ "{:,.0f}".format(order.collected_amount) }}</small>
+                                            <small class="text-success d-block fw-bold mt-1" style="font-size: 0.68rem;" title="تم تحصيل مصاريف الشحن من العميل"><i class="fa-solid fa-coins me-1"></i>بتحصيل شحن: {{ "{:,.0f}".format(order.collected_amount) }}</small>
                                             {% endif %}
                                         {% else %}
                                             <span class="badge bg-dark">{{ order.status }}</span>
                                         {% endif %}
                                     </td>
-                                    <td class="text-center" style="min-width: 120px;">
-                                        <button type="button" class="btn btn-sm {% if order.is_copied %}btn-dark{% else %}btn-success{% endif %} rounded-circle mb-1" title="نسخ للمندوب" onclick="copyOrderDetails({{ order.id }}, this)"
-                                                data-client="{{ order.client_name }}" 
-                                                data-phone="{{ order.phone }}"
-                                                data-address="{{ order.address }}"
-                                                data-content="{{ order.content if order.content else '' }}"
-                                                data-price="{{ order.cod }}"
-                                                data-company="{{ order.company.name if order.company else '' }}">
-                                            {% if order.is_copied %}<i class="fa-solid fa-check"></i>{% else %}<i class="fa-brands fa-whatsapp"></i>{% endif %}
-                                        </button>
-                                        <button type="button" class="btn btn-sm btn-primary rounded-circle mb-1" title="تعديل" onclick="openEditModal({{ order.id }})">
-                                            <i class="fa-solid fa-pen"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-sm btn-danger rounded-circle mb-1" title="مسح" onclick="deleteSingleOrder({{ order.id }})">
-                                            <i class="fa-solid fa-trash"></i>
-                                        </button>
+                                    <td class="px-1 text-center text-nowrap" style="width: 105px;">
+                                        <div class="d-inline-flex gap-1 align-items-center justify-content-center">
+                                            <button type="button" class="btn btn-sm {% if order.is_copied %}btn-dark{% else %}btn-success{% endif %} rounded-circle" style="width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="نسخ للمندوب" onclick="copyOrderDetails({{ order.id }}, this)"
+                                                    data-client="{{ order.client_name }}" 
+                                                    data-phone="{{ order.phone }}"
+                                                    data-address="{{ order.address }}"
+                                                    data-content="{{ order.content if order.content else '' }}"
+                                                    data-price="{{ order.cod }}"
+                                                    data-company="{{ order.company.name if order.company else '' }}">
+                                                {% if order.is_copied %}<i class="fa-solid fa-check"></i>{% else %}<i class="fa-brands fa-whatsapp"></i>{% endif %}
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-primary rounded-circle" style="width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="تعديل" onclick="openEditModal({{ order.id }})">
+                                                <i class="fa-solid fa-pen"></i>
+                                            </button>
+                                            <button type="button" class="btn btn-sm btn-danger rounded-circle" style="width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="مسح" onclick="deleteSingleOrder({{ order.id }})">
+                                                <i class="fa-solid fa-trash"></i>
+                                            </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 {% else %}
                                 <tr>
-                                    <td colspan="9" class="text-center py-5 text-muted">
+                                    <td colspan="11" class="text-center py-5 text-muted">
                                         <i class="fa-solid fa-box-open fa-3x mb-3 opacity-25"></i>
                                         <h5>لا توجد أوردرات مسجلة</h5>
                                     </td>
@@ -1166,20 +1185,30 @@
         let codHtml = `<div>${codVal.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>`;
         if (order.collected_amount != null && (st === 'تسليم جزئي / مرتجع' || (st === 'مرتجع شركة' && order.collected_amount > 0)) && order.collected_amount < codVal) {
             const netCompany = Number(order.collected_amount - (order.shipping_fee || 0)).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            codHtml += `
-                <div class="mt-1">
-                    <span class="badge bg-warning text-dark border border-secondary" style="font-size: 0.75rem; font-weight: bold;" title="صافي قيمة البضاعة المسلمة للشركة بعد خصم المرتجع والشحن">
-                        ${netCompany} ج.م
-                    </span>
-                    <small class="text-muted d-block" style="font-size: 0.68rem;">(للشركة)</small>
-                </div>
-            `;
+            const returnedVal = Number(codVal - order.collected_amount).toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            if (st === 'تسليم جزئي / مرتجع') {
+                codHtml += `
+                    <div class="mt-1 p-1 rounded bg-light border shadow-sm" style="font-size: 0.68rem; line-height: 1.25; text-align: start;">
+                        <div class="text-success fw-bold" title="قيمة البضاعة المباعة والمسلمة للعميل"><i class="fa-solid fa-check-circle me-1"></i>المُسلّم: ${netCompany}</div>
+                        <div class="text-danger fw-bold mt-1 pt-1 border-top" title="قيمة البضاعة المرتجعة"><i class="fa-solid fa-rotate-left me-1"></i>المرتجع: ${returnedVal}</div>
+                    </div>
+                `;
+            } else {
+                codHtml += `
+                    <div class="mt-1">
+                        <span class="badge bg-warning text-dark border border-secondary" style="font-size: 0.7rem; font-weight: bold;" title="صافي قيمة البضاعة المسلمة للشركة بعد خصم المرتجع والشحن">
+                            ${netCompany} ج.م
+                        </span>
+                        <small class="text-muted d-block" style="font-size: 0.62rem;">(للشركة)</small>
+                    </div>
+                `;
+            }
         }
 
         // Company & Region
-        let companyRegionHtml = `<span class="badge bg-info text-dark d-block mb-1">${order.company_name || '-'}</span>`;
+        let companyRegionHtml = `<span class="badge bg-info text-dark d-block mb-1 text-truncate" style="max-width: 120px;" title="${order.company_name || '-'}">${order.company_name || '-'}</span>`;
         if (order.region && order.region !== 'غير محدد') {
-            companyRegionHtml += `<span class="badge d-block text-dark border border-secondary" style="background-color: #f0f0f0;"><i class="fa-solid fa-map-pin me-1 opacity-75"></i> ${order.region}</span>`;
+            companyRegionHtml += `<span class="badge d-block text-dark border border-secondary text-truncate" style="max-width: 120px; background-color: #f0f0f0;" title="${order.region}"><i class="fa-solid fa-map-pin me-1 opacity-75"></i> ${order.region}</span>`;
         }
 
         // Actions
@@ -1189,47 +1218,49 @@
         const safeCompany = (order.company_name || '').replace(/"/g, '&quot;');
         
         const actionsHtml = `
-            <button type="button" class="btn btn-sm ${order.is_copied ? 'btn-dark' : 'btn-success'} rounded-circle mb-1" title="نسخ للمندوب" onclick="copyOrderDetails(${order.id}, this)"
-                    data-client="${safeClient}" 
-                    data-phone="${order.phone || ''}"
-                    data-address="${safeAddress}"
-                    data-content="${safeContent}"
-                    data-price="${codVal}"
-                    data-company="${safeCompany}">
-                ${order.is_copied ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-brands fa-whatsapp"></i>'}
-            </button>
-            <button type="button" class="btn btn-sm btn-primary rounded-circle mb-1 ms-1" title="تعديل" onclick="openEditModal(${order.id})">
-                <i class="fa-solid fa-pen"></i>
-            </button>
-            <button type="button" class="btn btn-sm btn-danger rounded-circle mb-1 ms-1" title="مسح" onclick="deleteSingleOrder(${order.id})">
-                <i class="fa-solid fa-trash"></i>
-            </button>
+            <div class="d-inline-flex gap-1 align-items-center justify-content-center">
+                <button type="button" class="btn btn-sm ${order.is_copied ? 'btn-dark' : 'btn-success'} rounded-circle" style="width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="نسخ للمندوب" onclick="copyOrderDetails(${order.id}, this)"
+                        data-client="${safeClient}" 
+                        data-phone="${order.phone || ''}"
+                        data-address="${safeAddress}"
+                        data-content="${safeContent}"
+                        data-price="${codVal}"
+                        data-company="${safeCompany}">
+                    ${order.is_copied ? '<i class="fa-solid fa-check"></i>' : '<i class="fa-brands fa-whatsapp"></i>'}
+                </button>
+                <button type="button" class="btn btn-sm btn-primary rounded-circle" style="width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="تعديل" onclick="openEditModal(${order.id})">
+                    <i class="fa-solid fa-pen"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-danger rounded-circle" style="width: 28px; height: 28px; padding: 0; display: inline-flex; align-items: center; justify-content: center; font-size: 0.75rem;" title="مسح" onclick="deleteSingleOrder(${order.id})">
+                    <i class="fa-solid fa-trash"></i>
+                </button>
+            </div>
         `;
 
         tr.innerHTML = `
-            <td class="px-3">
+            <td class="text-center px-1" style="width: 32px;">
                 <input class="form-check-input order-checkbox" type="checkbox" name="order_ids" value="${order.id}" id="checkbox-${order.id}">
             </td>
-            <td class="px-2 fw-bold text-primary">${order.tracking_number}</td>
-            <td>
+            <td class="px-1 fw-bold text-primary text-nowrap">${order.tracking_number}</td>
+            <td class="px-1 text-nowrap">
                 <small class="text-muted">${order.created_at || '-'}</small>
                 <span class="badge bg-warning text-dark d-block mt-1" style="font-size: 0.65rem;"><i class="fa-solid fa-bolt"></i> باركود</span>
             </td>
-            <td>${companyRegionHtml}</td>
-            <td>
-                <div class="fw-bold">${order.client_name || '-'}</div>
-                <small class="text-muted"><i class="fa-solid fa-phone fa-sm"></i> ${order.phone || '-'}</small>
+            <td class="px-1" style="min-width: 105px;">${companyRegionHtml}</td>
+            <td class="px-1" style="min-width: 115px;">
+                <div class="fw-bold text-truncate" style="max-width: 130px;" title="${order.client_name || '-'}">${order.client_name || '-'}</div>
+                <small class="text-muted text-nowrap"><i class="fa-solid fa-phone fa-sm"></i> ${order.phone || '-'}</small>
             </td>
-            <td>
-                <div class="text-wrap" style="max-width: 250px; font-size: 0.9rem;">${order.address || '-'}</div>
+            <td class="px-1">
+                <div class="text-wrap" style="max-width: 175px; font-size: 0.8rem; line-height: 1.25;">${order.address || '-'}</div>
             </td>
-            <td>
-                <div class="text-wrap text-muted" style="max-width: 150px; font-size: 0.8rem;">${order.content || '-'}</div>
+            <td class="px-1">
+                <div class="text-wrap text-muted" style="max-width: 105px; font-size: 0.76rem; line-height: 1.2;">${order.content || '-'}</div>
             </td>
-            <td class="fw-bold text-success">${codHtml}</td>
-            <td class="text-muted">${order.shipping_fee != null ? order.shipping_fee : '-'}</td>
-            <td>${statusBadge}</td>
-            <td class="text-center" style="min-width: 120px;">${actionsHtml}</td>
+            <td class="px-1 fw-bold text-success text-nowrap" style="min-width: 90px;">${codHtml}</td>
+            <td class="px-1 text-center text-muted text-nowrap" style="width: 60px;">${order.shipping_fee != null ? order.shipping_fee : '-'}</td>
+            <td class="px-1 text-center" style="min-width: 100px;">${statusBadge}</td>
+            <td class="px-1 text-center text-nowrap" style="width: 105px;">${actionsHtml}</td>
         `;
         return tr;
     }
