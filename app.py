@@ -1499,9 +1499,40 @@ def reset_db():
     return redirect(url_for('index'))
 
 
+@app.route('/company/new', methods=['POST'])
+@login_required
+def create_company():
+    try:
+        company_name = request.form.get('name', '').strip()
+        redirect_to = request.form.get('redirect_to', 'company_accounting')
+        
+        if not company_name:
+            flash('يرجى كتابة اسم الشركة!', 'warning')
+            return redirect(url_for('company_accounting'))
+            
+        existing = Company.query.filter(db.func.lower(Company.name) == company_name.lower()).first()
+        if existing:
+            flash(f'الشركة "{existing.name}" مسجلة بالفعل في السيستم!', 'info')
+            if redirect_to == 'company_accounting':
+                return redirect(url_for('company_accounting', company_id=existing.id))
+            return redirect(url_for('index', tab='orders'))
+            
+        new_company = Company(name=company_name)
+        db.session.add(new_company)
+        db.session.commit()
+        
+        flash(f'تمت إضافة شركة "{new_company.name}" بنجاح! يمكنك الآن تسجيل تعاملاتها وحسابها.', 'success')
+        if redirect_to == 'company_accounting':
+            return redirect(url_for('company_accounting', company_id=new_company.id))
+        return redirect(url_for('index', tab='orders'))
+    except Exception as e:
+        db.session.rollback()
+        flash('حدث خطأ أثناء إضافة الشركة.', 'danger')
+        return redirect(url_for('company_accounting'))
+
 @app.route('/accounting/company', methods=['GET', 'POST'])
 def company_accounting():
-    companies = Company.query.all()
+    companies = Company.query.order_by(Company.name).all()
     selected_company_id = request.args.get('company_id')
     selected_company = None
     orders = []

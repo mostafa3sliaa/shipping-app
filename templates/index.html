@@ -249,7 +249,12 @@
             
             <div class="col-md-6 mb-4">
                 <div class="card shadow-sm border-0 h-100">
-                    <div class="card-header bg-white fw-bold"><i class="fa-solid fa-building text-primary me-2"></i> إحصائيات الشركات</div>
+                    <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                        <div><i class="fa-solid fa-building text-primary me-2"></i> إحصائيات الشركات</div>
+                        <button type="button" class="btn btn-sm btn-outline-primary fw-bold rounded-pill px-3 shadow-sm" data-bs-toggle="modal" data-bs-target="#newCompanyModal">
+                            <i class="fa-solid fa-plus me-1"></i> إضافة شركة
+                        </button>
+                    </div>
                     <div class="card-body p-0">
                         <table class="table table-hover mb-0">
                             <thead class="table-light">
@@ -777,6 +782,33 @@
                     <div class="d-flex justify-content-end">
                         <button type="submit" class="btn btn-success px-4 fw-bold"><i class="fa-solid fa-upload me-1"></i> رفع وحفظ وبدء الطباعة</button>
                     </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- New Company Modal -->
+<div class="modal fade" id="newCompanyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content text-end">
+            <div class="modal-header bg-primary text-white">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-building me-2"></i> إضافة شركة جديدة</h5>
+                <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('create_company') }}" method="POST">
+                    <input type="hidden" name="redirect_to" value="company_accounting">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اسم الشركة / التاجر:</label>
+                        <input type="text" name="name" class="form-control form-control-lg fw-bold" placeholder="مثال: براند كيدز، فاشونستا، إلخ..." required autofocus>
+                        <small class="text-muted d-block mt-1">
+                            <i class="fa-solid fa-circle-info me-1"></i> سيتم إنشاء ملف حساب للشركة فوراً وتوجيهك إليه مباشرة حتى لو لم تكن لها بضاعة مسجلة بالمخزن بعد.
+                        </small>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100 fw-bold py-2 shadow-sm">
+                        <i class="fa-solid fa-check me-1"></i> حفظ وفتح كشف حساب الشركة
+                    </button>
                 </form>
             </div>
         </div>

@@ -1291,6 +1291,22 @@ def test_company_debt_deducted_from_dashboard_capital(client):
     assert '3,000.00' in content2
     assert 'مديونية الشركات' in content2
 
+def test_create_standalone_company(client):
+    # Add a company that has no orders in the warehouse
+    res = client.post('/company/new', data={
+        'name': 'شركة جديدة تماما',
+        'redirect_to': 'company_accounting'
+    }, follow_redirects=True)
+    assert res.status_code == 200
+
+    with app.app_context():
+        comp = Company.query.filter_by(name='شركة جديدة تماما').first()
+        assert comp is not None
+
+    page_content = res.get_data(as_text=True)
+    assert 'شركة جديدة تماما' in page_content
+    assert 'كشف حساب شركة' in page_content
+
 
 
 

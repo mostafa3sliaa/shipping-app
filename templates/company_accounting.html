@@ -34,24 +34,34 @@
 </ul>
 
 <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-info text-white py-3">
+    <div class="card-header bg-info text-white py-3 d-flex flex-wrap justify-content-between align-items-center gap-2">
         <h4 class="mb-0 fw-bold"><i class="fa-solid fa-building me-2"></i> كشف حساب شركة (التاجر)</h4>
+        <button type="button" class="btn btn-light text-info fw-bold btn-sm rounded-pill shadow-sm" data-bs-toggle="modal" data-bs-target="#newCompanyModal">
+            <i class="fa-solid fa-plus-circle me-1"></i> إضافة شركة جديدة
+        </button>
     </div>
     <div class="card-body p-4">
         
-        <form method="GET" action="{{ url_for('company_accounting') }}" class="row align-items-end mb-5 bg-light p-3 rounded border">
-            <div class="col-md-5">
-                <label class="form-label fw-bold text-muted">اختر الشركة:</label>
-                <select name="company_id" class="form-select fw-bold" required onchange="this.form.submit()">
-                    <option value="">-- اختر الشركة --</option>
-                    {% for c in companies %}
-                    <option value="{{ c.id }}" {% if selected_company and selected_company.id == c.id %}selected{% endif %}>
-                        {{ c.name }}
-                    </option>
-                    {% endfor %}
-                </select>
+        <div class="row align-items-end mb-5 bg-light p-3 rounded border">
+            <div class="col-md-6 mb-3 mb-md-0">
+                <form method="GET" action="{{ url_for('company_accounting') }}">
+                    <label class="form-label fw-bold text-muted">اختر الشركة / التاجر:</label>
+                    <select name="company_id" class="form-select fw-bold" required onchange="this.form.submit()">
+                        <option value="">-- اختر الشركة --</option>
+                        {% for c in companies %}
+                        <option value="{{ c.id }}" {% if selected_company and selected_company.id == c.id %}selected{% endif %}>
+                            {{ c.name }}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </form>
             </div>
-        </form>
+            <div class="col-md-6 text-md-start">
+                <button type="button" class="btn btn-success fw-bold rounded-pill px-4 shadow-sm" data-bs-toggle="modal" data-bs-target="#newCompanyModal">
+                    <i class="fa-solid fa-plus me-1"></i> إضافة شركة جديدة (غير موجودة)
+                </button>
+            </div>
+        </div>
 
         {% if selected_company %}
             
@@ -397,4 +407,32 @@
             </div>
 
 {% endif %}
+
+<!-- New Company Modal -->
+<div class="modal fade" id="newCompanyModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content text-end">
+            <div class="modal-header bg-info text-white">
+                <h5 class="modal-title fw-bold"><i class="fa-solid fa-building me-2"></i> إضافة شركة جديدة (تاجر جديد)</h5>
+                <button type="button" class="btn-close btn-close-white ms-0 me-auto" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form action="{{ url_for('create_company') }}" method="POST">
+                    <input type="hidden" name="redirect_to" value="company_accounting">
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">اسم الشركة / التاجر:</label>
+                        <input type="text" name="name" class="form-control form-control-lg fw-bold" placeholder="مثال: براند كيدز، فاشونستا، إلخ..." required autofocus>
+                        <small class="text-muted d-block mt-1">
+                            <i class="fa-solid fa-circle-info me-1"></i> سيتم إنشاء ملف حساب للشركة فوراً وتوجيهك إليه مباشرة حتى لو لم تكن لها بضاعة مسجلة بالمخزن بعد.
+                        </small>
+                    </div>
+                    <button type="submit" class="btn btn-info text-white w-100 fw-bold py-2 shadow-sm">
+                        <i class="fa-solid fa-check me-1"></i> حفظ وفتح كشف حساب الشركة
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
