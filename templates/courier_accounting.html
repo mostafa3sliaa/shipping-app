@@ -105,9 +105,7 @@
                                             <option value="تسليم جزئي / مرتجع" {% if order.status == 'تسليم جزئي / مرتجع' %}selected{% endif %}>تسليم جزئي / مرتجع</option>
                                             <option value="مرتجع_مخزن">مرتجع للمخزن (بدون رسوم - هيطلع تاني)</option>
                                             <option value="مرتجع" {% if order.status == 'مرتجع' %}selected{% endif %}>مرتجع نهائي (بدون رسوم)</option>
-                                            <option value="مرتجع شركة" {% if order.status == 'مرتجع شركة' %}selected{% endif %}>مرتجع للشركة (بدون رسوم)</option>
                                             <option value="مرتجع بشحن" {% if order.status == 'مرتجع بشحن' %}selected{% endif %}>مرتجع (بتحصيل شحن)</option>
-                                            <option value="مؤجل" {% if order.status == 'مؤجل' %}selected{% endif %}>مؤجل</option>
                                         </select>
                                     </td>
                                     <td>
@@ -185,7 +183,9 @@
                             feeInputs.forEach(input => {
                                 const id = input.id.split('_')[2];
                                 const status = document.getElementById('status_' + id).value;
-                                if (status !== 'مع المندوب' && status !== 'مؤجل' && status !== 'مرتجع_مخزن') {
+                                if (status === 'مرتجع' || status === 'مرتجع_مخزن' || status === 'مع المندوب' || status === 'مؤجل' || status === 'مرتجع شركة') {
+                                    input.value = "0";
+                                } else {
                                     input.value = bulkFee;
                                 }
                             });
@@ -236,6 +236,7 @@
                         } else if (status === 'مرتجع' || status === 'مرتجع شركة') {
                             collectedInput.value = "0";
                             collectedInput.readOnly = true;
+                            feeInput.value = "0";
                             feeInput.readOnly = false;
                             row.classList.remove('bg-light', 'table-success', 'table-warning', 'table-info');
                             row.classList.add('table-danger');

@@ -1307,16 +1307,55 @@ def test_create_standalone_company(client):
     assert 'شركة جديدة تماما' in page_content
     assert 'كشف حساب شركة' in page_content
 
+def test_courier_accounting_return_no_fee_and_removed_options(client):
+    with app.app_context():
+        comp = Company(name="شركة فحص التقفيل")
+        cour = Courier(name="مندوب فحص التقفيل")
+        db.session.add_all([comp, cour])
+        db.session.commit()
+        cour_id = cour.id
+        comp_id = comp.id
 
+        order = Order(
+            tracking_number="TRK-RET-NO-FEE",
+            client_name="عميل فحص",
+            phone="01012345678",
+            cod=400.0,
+            shipping_fee=70.0,
+            status="مع المندوب",
+            company_id=comp_id,
+            courier_id=cour_id
+        )
+        db.session.add(order)
+        db.session.commit()
+        order_id = order.id
 
+    # 1. Check page HTML for options:
+    res = client.get(f'/accounting/courier?courier_id={cour_id}')
+    assert res.status_code == 200
+    html = res.get_data(as_text=True)
 
+    # Must NOT contain 'مرتجع للشركة (بدون رسوم)' or 'مؤجل' in status select
+    assert 'مرتجع للشركة (بدون رسوم)' not in html
+    assert '<option value="مرتجع شركة"' not in html
+    assert '<option value="مؤجل"' not in html
 
+    # MUST contain 'مرتجع نهائي (بدون رسوم)'
+    assert '<option value="مرتجع"' in html
+    assert 'مرتجع نهائي (بدون رسوم)' in html
 
+    # 2. Settle order as 'مرتجع' with 0 fee
+    res_settle = client.post(f'/accounting/courier?courier_id={cour_id}', data={
+        'action': 'settle',
+        f'status_{order_id}': 'مرتجع',
+        f'collected_{order_id}': '0',
+        f'courier_fee_{order_id}': '0',
+        'transfers': '0'
+    }, follow_redirects=True)
+    assert res_settle.status_code == 200
 
-
-
-
-
-
-
-
+    with app.app_context():
+        o = db.session.get(Order, order_id)
+        assert o.status == 'مرتجع'
+        assert o.courier_settled == True
+        assert (o.courier_fee or 0.0) == 0.0
