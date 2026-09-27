@@ -24,18 +24,20 @@ app.config['SQLALCHEMY_DATABASE_URI'] = db_url or 'sqlite:///shipping.db'
 
 if db_url:
     app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_pre_ping': True,
-        'pool_recycle': 300,
-        'pool_size': 5,
-        'max_overflow': 10,
+        'poolclass': NullPool,
         'connect_args': {
-            'connect_timeout': 10
+            'connect_timeout': 10,
+            'sslmode': 'require'
         }
     }
-app.config['UPLOAD_FOLDER'] = 'uploads'
+upload_dir = '/tmp/uploads' if os.environ.get('VERCEL') else 'uploads'
+app.config['UPLOAD_FOLDER'] = upload_dir
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024
 
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+try:
+    os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+except Exception:
+    pass
 
 @app.template_filter('string_color')
 def string_color(s):
@@ -205,20 +207,28 @@ def clean_phone_smart(val):
     only_digits = re.sub(r'[^\d]', '', s)
     return only_digits if only_digits else s.strip()
 
-with app.app_context():
-    try:
-        if not os.environ.get('DATABASE_URL'):
+if not os.environ.get('DATABASE_URL'):
+    with app.app_context():
+        try:
             db.create_all()
             if not User.query.filter_by(username='admin').first():
                 hashed = generate_password_hash('admin123')
                 default_admin = User(username='admin', password_hash=hashed, role='admin')
                 db.session.add(default_admin)
                 db.session.commit()
-        # Migrate any legacy 'مرتجع بشحن' status to standard 'مرتجع'
-        Order.query.filter_by(status='مرتجع بشحن').update({'status': 'مرتجع'})
-        db.session.commit()
-    except Exception:
-        pass
+            Order.query.filter_by(status='مرتجع بشحن').update({'status': 'مرتجع'})
+            db.session.commit()
+        except Exception:
+            pass
+
+@app.route('/health')
+def health_check():
+    return {'status': 'healthy'}, 200
+
+@app.errorhandler(500)
+def server_error(e):
+    import traceback
+    return f"500 Internal Error:\n{traceback.format_exc()}", 500, {'Content-Type': 'text/plain; charset=utf-8'}
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
