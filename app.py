@@ -14,7 +14,8 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from werkzeug.security import generate_password_hash, check_password_hash
 from io import BytesIO
 
-app = Flask(__name__)
+base_dir = os.path.abspath(os.path.dirname(__file__))
+app = Flask(__name__, template_folder=os.path.join(base_dir, 'templates'), static_folder=os.path.join(base_dir, 'static'))
 app.config['SECRET_KEY'] = 'supersecretkey'
 import os
 db_url = os.environ.get('DATABASE_URL')
