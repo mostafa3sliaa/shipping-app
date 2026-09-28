@@ -655,7 +655,8 @@ def index():
 @app.route('/export_excel', methods=['GET', 'POST'])
 @login_required
 def export_excel():
-    order_ids = request.form.getlist('order_ids') or request.args.getlist('order_ids')
+    raw_order_ids = request.form.getlist('order_ids') or request.args.getlist('order_ids')
+    order_ids = [int(x) for x in raw_order_ids if str(x).isdigit()]
 
     query = Order.query.options(joinedload(Order.company), joinedload(Order.courier))
     
@@ -1169,7 +1170,8 @@ def delete_order(order_id):
 @app.route('/orders/bulk_action', methods=['POST'])
 def bulk_action():
     action = request.form.get('action')
-    order_ids = request.form.getlist('order_ids')
+    raw_order_ids = request.form.getlist('order_ids')
+    order_ids = [int(x) for x in raw_order_ids if str(x).isdigit()]
     courier_name = request.form.get('courier_name', '').strip()
     region_name = request.form.get('bulk_region_name', '').strip()
     fee_raw = request.form.get('bulk_shipping_fee', '').strip()

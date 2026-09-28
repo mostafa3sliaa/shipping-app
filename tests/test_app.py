@@ -1359,3 +1359,51 @@ def test_courier_accounting_return_no_fee_and_removed_options(client):
         assert o.status == 'مرتجع'
         assert o.courier_settled == True
         assert (o.courier_fee or 0.0) == 0.0
+
+def test_bulk_action_and_export_excel_with_string_ids(client):
+    with app.app_context():
+        order1 = Order(
+            tracking_number="TRK-BULK-STR-1",
+            client_name="عميل جماعي 1",
+            phone="01011111111",
+            cod=100.0,
+            status="مخزن"
+        )
+        order2 = Order(
+            tracking_number="TRK-BULK-STR-2",
+            client_name="عميل جماعي 2",
+            phone="01022222222",
+            cod=200.0,
+            status="مخزن"
+        )
+        db.session.add_all([order1, order2])
+        db.session.commit()
+        id1 = str(order1.id)
+        id2 = str(order2.id)
+
+    # Test bulk action with string IDs
+    res = client.post('/orders/bulk_action', data={
+        'order_ids': [id1, id2],
+        'courier_name': 'مندوب جماعي',
+        'bulk_region_name': 'مدينة نصر',
+        'bulk_shipping_fee': '45'
+    }, follow_redirects=True)
+    assert res.status_code == 200
+
+    with app.app_context():
+        o1 = db.session.get(Order, int(id1))
+        o2 = db.session.get(Order, int(id2))
+        assert o1.region == 'مدينة نصر'
+        assert o1.shipping_fee == 45.0
+        assert o1.courier.name == 'مندوب جماعي'
+        assert o2.region == 'مدينة نصر'
+        assert o2.shipping_fee == 45.0
+
+    # Test export excel with string IDs
+    res_export = client.post('/export_excel', data={
+        'order_ids': [id1, id2],
+        'action': 'export_excel'
+    })
+    assert res_export.status_code == 200
+    assert res_export.mimetype == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
