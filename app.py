@@ -455,8 +455,10 @@ def index():
             query = query.filter(Order.company_id.is_(None))
         elif filter_company == 'all':
             query = query.filter(Order.company_id.isnot(None))
+        elif str(filter_company).isdigit():
+            query = query.filter(Order.company_id == int(filter_company))
         else:
-            query = query.filter_by(company_id=filter_company)
+            query = query.join(Company, Order.company_id == Company.id).filter(Company.name == filter_company)
         
     if filter_status:
         if filter_status == 'none':
@@ -476,8 +478,10 @@ def index():
             query = query.filter(Order.courier_id.is_(None))
         elif filter_courier == 'all':
             query = query.filter(Order.courier_id.isnot(None))
+        elif str(filter_courier).isdigit():
+            query = query.filter(Order.courier_id == int(filter_courier))
         else:
-            query = query.filter_by(courier_id=filter_courier)
+            query = query.join(Courier, Order.courier_id == Courier.id).filter(Courier.name == filter_courier)
         
     if filter_region:
         if filter_region == 'none':
@@ -688,8 +692,10 @@ def export_excel():
                 query = query.filter(Order.company_id.is_(None))
             elif filter_company == 'all':
                 query = query.filter(Order.company_id.isnot(None))
+            elif str(filter_company).isdigit():
+                query = query.filter(Order.company_id == int(filter_company))
             else:
-                query = query.filter_by(company_id=filter_company)
+                query = query.join(Company, Order.company_id == Company.id).filter(Company.name == filter_company)
         if filter_status:
             if filter_status == 'none':
                 query = query.filter(or_(Order.status.is_(None), Order.status == ''))
@@ -707,8 +713,10 @@ def export_excel():
                 query = query.filter(Order.courier_id.is_(None))
             elif filter_courier == 'all':
                 query = query.filter(Order.courier_id.isnot(None))
+            elif str(filter_courier).isdigit():
+                query = query.filter(Order.courier_id == int(filter_courier))
             else:
-                query = query.filter_by(courier_id=filter_courier)
+                query = query.join(Courier, Order.courier_id == Courier.id).filter(Courier.name == filter_courier)
         if filter_region:
             if filter_region == 'none':
                 query = query.filter(or_(Order.region.is_(None), Order.region == '', Order.region == 'غير محدد'))
@@ -1922,7 +1930,7 @@ def courier_accounting():
     net_cash = 0.0
     
     if selected_courier_id:
-        selected_courier = Courier.query.get(selected_courier_id)
+        selected_courier = db.session.get(Courier, int(selected_courier_id)) if str(selected_courier_id).isdigit() else None
         if selected_courier:
             # Fetch orders that are NOT settled yet.
             orders = Order.query.options(joinedload(Order.company)).filter(

@@ -1407,3 +1407,41 @@ def test_bulk_action_and_export_excel_with_string_ids(client):
     assert res_export.status_code == 200
     assert res_export.mimetype == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
 
+def test_filter_by_courier_and_company_with_string_params(client):
+    with app.app_context():
+        comp = Company(name="شركة فحص التصفية")
+        cour = Courier(name="مندوب فحص التصفية")
+        db.session.add_all([comp, cour])
+        db.session.commit()
+        comp_id = str(comp.id)
+        cour_id = str(cour.id)
+
+        o = Order(
+            tracking_number="TRK-FILTER-PARAM-1",
+            client_name="عميل التصفية",
+            phone="01099999999",
+            cod=350.0,
+            shipping_fee=60.0,
+            status="مع المندوب",
+            company_id=int(comp_id),
+            courier_id=int(cour_id)
+        )
+        db.session.add(o)
+        db.session.commit()
+
+    # 1. Test index filtering by courier_id as string
+    res = client.get(f'/?tab=orders&courier_id={cour_id}&status=مع+المندوب')
+    assert res.status_code == 200
+    assert 'TRK-FILTER-PARAM-1' in res.get_data(as_text=True)
+
+    # 2. Test index filtering by company_id as string
+    res2 = client.get(f'/?tab=orders&company_id={comp_id}')
+    assert res2.status_code == 200
+    assert 'TRK-FILTER-PARAM-1' in res2.get_data(as_text=True)
+
+    # 3. Test export_excel filtering by courier_id as string
+    res3 = client.get(f'/export_excel?courier_id={cour_id}&status=مع+المندوب')
+    assert res3.status_code == 200
+    assert res3.mimetype == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+
