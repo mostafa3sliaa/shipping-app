@@ -2,6 +2,11 @@
 
 {% block content %}
 <style>
+    /* Completely disable transform animations on cards to eliminate page vibration / jitter */
+    .card, .card:hover, .stat-card, .stat-card:hover, .settlement-bar:hover {
+        transform: none !important;
+        transition: none !important;
+    }
     .blur-sensitive {
         filter: blur(6px);
         transition: filter 0.25s ease-in-out;
@@ -13,20 +18,14 @@
         filter: none !important;
     }
     .settlement-bar {
-        transition: all 0.2s ease-in-out;
         border-right: 5px solid #0d6efd !important;
+        transition: background-color 0.15s ease-in-out;
     }
     .settlement-bar:hover {
-        background-color: #f8f9fa;
-        transform: translateY(-2px);
-        box-shadow: 0 .5rem 1rem rgba(0,0,0,.15)!important;
+        background-color: #f1f3f5 !important;
     }
     .stat-card {
         border-radius: 12px;
-        transition: transform 0.2s ease;
-    }
-    .stat-card:hover {
-        transform: translateY(-3px);
     }
     #courierSubTabs .nav-link {
         border-radius: 8px;
@@ -106,7 +105,7 @@
 
     <div class="card-body p-4">
         <!-- Courier Selection Form -->
-        <form method="GET" action="{{ url_for('courier_accounting') }}" class="row g-2 align-items-end mb-4 bg-light p-3 rounded border" id="courierSelectForm">
+        <form method="GET" action="{{ url_for('courier_accounting') }}" class="row g-2 align-items-end mb-4 bg-light p-3 rounded border" id="courierSelectForm" data-turbo="false">
             <input type="hidden" name="subtab" id="subtabInput" value="{{ active_tab }}">
             <div class="col-md-5">
                 <label class="form-label fw-bold text-muted"><i class="fa-solid fa-user-tie me-1 text-warning"></i> اختر المندوب للتقفيل أو عرض السجل:</label>
@@ -129,7 +128,7 @@
                 <!-- TAB 1: حساب المندوب (العهدة المفتوحة للتقفيل) -->
                 <div class="tab-pane fade {% if active_tab != 'history' %}show active{% endif %}" id="courier-account" role="tabpanel" aria-labelledby="courier-account-tab">
                     {% if orders %}
-                        <form method="POST" action="{{ url_for('courier_accounting', courier_id=selected_courier.id) }}" id="accountingForm">
+                        <form method="POST" action="{{ url_for('courier_accounting', courier_id=selected_courier.id) }}" id="accountingForm" data-turbo="false">
                             <input type="hidden" name="action" value="settle">
                             
                             <div class="row mb-3 align-items-center">
@@ -174,21 +173,21 @@
                                             <td>
                                                 <select name="status_{{ order.id }}" id="status_{{ order.id }}" class="form-select form-select-sm fw-bold status-select" onchange="updateRow('{{ order.id }}', true)">
                                                     <option value="مع المندوب">لم يُسلم بعد (مع المندوب)</option>
-                                                    <option value="تم التوصيل" {% if order.status in ['تم التوصيل', 'مع المندوب'] %}selected{% endif %}>تم التوصيل</option>
-                                                    <option value="تسليم جزئي / مرتجع" {% if order.status == 'تسليم جزئي / مرتجع' %}selected{% endif %}>تسليم جزئي / مرتجع</option>
+                                                    <option value="تم التوصيل" {% if order.status in ['تم التوصيل', 'مع المندوب'] and (order.collected_amount is none or order.collected_amount >= order.cod) %}selected{% endif %}>تم التوصيل</option>
+                                                    <option value="تسليم جزئي / مرتجع" {% if order.status in ['تسليم جزئي / مرتجع', 'تسليم جزئي', 'مرتجع جزئي', 'مرتجع جزئى'] or (order.collected_amount is not none and 0 < order.collected_amount < order.cod and order.status != 'مرتجع بشحن') %}selected{% endif %}>تسليم جزئي / مرتجع</option>
                                                     <option value="مرتجع_مخزن">مرتجع للمخزن (بدون رسوم - هيطلع تاني)</option>
-                                                    <option value="مرتجع" {% if order.status == 'مرتجع' %}selected{% endif %}>مرتجع نهائي (بدون رسوم)</option>
-                                                    <option value="مرتجع بشحن" {% if order.status == 'مرتجع بشحن' %}selected{% endif %}>مرتجع (بتحصيل شحن)</option>
+                                                    <option value="مرتجع" {% if order.status in ['مرتجع', 'مرتجع شركة'] and (not order.collected_amount or order.collected_amount == 0) %}selected{% endif %}>مرتجع نهائي (بدون رسوم)</option>
+                                                    <option value="مرتجع بشحن" {% if order.status == 'مرتجع بشحن' or (order.status == 'مرتجع' and order.collected_amount and order.collected_amount > 0 and order.collected_amount == order.shipping_fee) %}selected{% endif %}>مرتجع (بتحصيل شحن)</option>
                                                 </select>
                                             </td>
                                             <td>
                                                 <div class="input-group input-group-sm">
-                                                    <input type="number" step="0.01" name="collected_{{ order.id }}" id="collected_{{ order.id }}" class="form-control text-success fw-bold" value="{{ order.collected_amount if (order.collected_amount is not none and order.collected_amount > 0) else (order.cod if order.status in ['تم التوصيل', 'مع المندوب'] else '0') }}" oninput="updateTotals()">
+                                                    <input type="number" step="0.01" name="collected_{{ order.id }}" id="collected_{{ order.id }}" class="form-control text-success fw-bold" value="{% if order.collected_amount is not none and order.collected_amount > 0 and (order.status in ['تسليم جزئي / مرتجع', 'تسليم جزئي', 'مرتجع جزئي', 'مرتجع جزئى'] or order.collected_amount < order.cod) %}{{ order.collected_amount }}{% elif order.status in ['تم التوصيل', 'مع المندوب'] %}{{ order.cod }}{% elif order.status == 'مرتجع بشحن' %}{{ order.shipping_fee or 70.0 }}{% else %}0{% endif %}" oninput="updateTotals()">
                                                 </div>
                                             </td>
                                             <td>
                                                 <div class="input-group input-group-sm">
-                                                    <input type="number" step="0.01" name="courier_fee_{{ order.id }}" id="courier_fee_{{ order.id }}" class="form-control text-danger fw-bold fee-input" value="0" oninput="updateTotals()">
+                                                    <input type="number" step="0.01" name="courier_fee_{{ order.id }}" id="courier_fee_{{ order.id }}" class="form-control text-danger fw-bold fee-input" value="{{ order.courier_fee or 0 }}" oninput="updateTotals()">
                                                 </div>
                                             </td>
                                             <td class="fw-bold fs-5">
@@ -706,8 +705,12 @@
             row.classList.add('table-success');
         } else if (status === 'تسليم جزئي / مرتجع') {
             const curVal = parseFloat(collectedInput.value);
-            if ((statusChanged || isNaN(curVal) || curVal === 0) && cod > 0) {
-                collectedInput.value = cod;
+            if (statusChanged) {
+                if (isNaN(curVal) || curVal === cod || curVal <= 0) {
+                    collectedInput.value = "";
+                    collectedInput.placeholder = "المبلغ المحصل";
+                    setTimeout(() => collectedInput.focus(), 50);
+                }
             }
             collectedInput.readOnly = false;
             feeInput.readOnly = false;
@@ -782,14 +785,21 @@
         if (finalCashEl) finalCashEl.innerText = (netCash - transfers).toFixed(2);
     }
 
-    // Run on load
-    (function() {
+    // Run on load and Turbo page visits
+    function initAccountingRows() {
         const selects = document.querySelectorAll('.status-select');
         selects.forEach(select => {
             const id = select.id.split('_')[1];
-            updateRow(id);
+            updateRow(id, false);
         });
-    })();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initAccountingRows);
+    } else {
+        initAccountingRows();
+    }
+    document.addEventListener('turbo:load', initAccountingRows);
     
     function copyWhatsAppMessage() {
         let text = "*شيت شغل المندوب*\n\n";
