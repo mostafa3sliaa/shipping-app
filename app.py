@@ -3,7 +3,7 @@ import uuid
 import re
 import pandas as pd
 import hashlib
-from flask import Flask, render_template, request, redirect, url_for, flash, send_file
+from flask import Flask, render_template, request, redirect, url_for, flash, send_file, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.utils import secure_filename
 from sqlalchemy.orm import joinedload
@@ -74,6 +74,22 @@ class Courier(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     phone = db.Column(db.String(150))
 
+class CourierSettlement(db.Model):
+    __tablename__ = 'courier_settlement'
+    id = db.Column(db.Integer, primary_key=True)
+    courier_id = db.Column(db.Integer, db.ForeignKey('courier.id'), nullable=False)
+    courier = db.relationship('Courier', backref=db.backref('settlements', lazy=True, order_by='CourierSettlement.settled_at.desc()'))
+    settled_at = db.Column(db.DateTime, default=datetime.now)
+    total_orders = db.Column(db.Integer, default=0)
+    delivered_count = db.Column(db.Integer, default=0)
+    returned_count = db.Column(db.Integer, default=0)
+    total_cod = db.Column(db.Float, default=0.0)
+    courier_commission = db.Column(db.Float, default=0.0)
+    company_profit = db.Column(db.Float, default=0.0)
+    transfers = db.Column(db.Float, default=0.0)
+    net_cash = db.Column(db.Float, default=0.0)
+    notes = db.Column(db.String(255), nullable=True)
+
 class Order(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     tracking_number = db.Column(db.String(50), unique=True, nullable=False)
@@ -100,6 +116,9 @@ class Order(db.Model):
     
     courier_id = db.Column(db.Integer, db.ForeignKey('courier.id'))
     courier = db.relationship('Courier', backref=db.backref('orders', lazy=True))
+    
+    courier_settlement_id = db.Column(db.Integer, db.ForeignKey('courier_settlement.id'), nullable=True)
+    courier_settlement = db.relationship('CourierSettlement', backref=db.backref('orders', lazy=True))
 
 
 class TreasuryTransaction(db.Model):
@@ -208,19 +227,29 @@ def clean_phone_smart(val):
     only_digits = re.sub(r'[^\d]', '', s)
     return only_digits if only_digits else s.strip()
 
-if not os.environ.get('DATABASE_URL'):
-    with app.app_context():
+with app.app_context():
+    try:
+        db.create_all()
         try:
-            db.create_all()
-            if not User.query.filter_by(username='admin').first():
-                hashed = generate_password_hash('admin123')
-                default_admin = User(username='admin', password_hash=hashed, role='admin')
-                db.session.add(default_admin)
-                db.session.commit()
-            Order.query.filter_by(status='مرتجع بشحن').update({'status': 'مرتجع'})
+            db.session.execute(text('ALTER TABLE "order" ADD COLUMN IF NOT EXISTS courier_settlement_id INTEGER;'))
             db.session.commit()
         except Exception:
-            pass
+            db.session.rollback()
+            try:
+                db.session.execute(text('ALTER TABLE "order" ADD COLUMN courier_settlement_id INTEGER;'))
+                db.session.commit()
+            except Exception:
+                db.session.rollback()
+
+        if not User.query.filter_by(username='admin').first():
+            hashed = generate_password_hash('admin123')
+            default_admin = User(username='admin', password_hash=hashed, role='admin')
+            db.session.add(default_admin)
+            db.session.commit()
+        Order.query.filter_by(status='مرتجع بشحن').update({'status': 'مرتجع'})
+        db.session.commit()
+    except Exception:
+        pass
 
 @app.route('/health')
 def health_check():
@@ -1929,6 +1958,18 @@ def courier_accounting():
     transfers = 0.0
     net_cash = 0.0
     
+    settlements = []
+    available_months = []
+    selected_month = request.args.get('month', '')
+    stats = {
+        'total_orders': 0,
+        'delivered_count': 0,
+        'returned_count': 0,
+        'courier_commission': 0.0,
+        'company_profit': 0.0,
+        'settlements_count': 0
+    }
+    
     if selected_courier_id:
         selected_courier = db.session.get(Courier, int(selected_courier_id)) if str(selected_courier_id).isdigit() else None
         if selected_courier:
@@ -1947,8 +1988,12 @@ def courier_accounting():
                         transfers = 0.0
                         
                     settled_count = 0
+                    delivered_count = 0
+                    returned_count = 0
                     batch_collected = 0.0
                     batch_fee = 0.0
+                    batch_profit = 0.0
+                    settled_orders = []
                     
                     for order in orders:
                         new_status = request.form.get(f'status_{order.id}')
@@ -1960,6 +2005,8 @@ def courier_accounting():
                                 order.courier_fee = None
                                 order.courier_settled = True
                                 settled_count += 1
+                                returned_count += 1
+                                settled_orders.append(order)
                             elif new_status in ['تم التوصيل', 'تسليم جزئي / مرتجع', 'مرتجع بشحن']:
                                 order.status = 'مرتجع' if new_status == 'مرتجع بشحن' else new_status
                                 try:
@@ -1972,8 +2019,15 @@ def courier_accounting():
                                     order.courier_fee = 0.0
                                 order.courier_settled = True
                                 settled_count += 1
+                                if new_status == 'مرتجع بشحن':
+                                    returned_count += 1
+                                    batch_profit += ((order.collected_amount or order.shipping_fee or 70.0) - (order.courier_fee or 0.0))
+                                else:
+                                    delivered_count += 1
+                                    batch_profit += ((order.shipping_fee or 70.0) - (order.courier_fee or 0.0))
                                 batch_collected += (order.collected_amount or 0.0)
                                 batch_fee += (order.courier_fee or 0.0)
+                                settled_orders.append(order)
                             elif new_status in ['مرتجع', 'مرتجع شركة']:
                                 order.status = new_status
                                 order.collected_amount = 0.0
@@ -1983,29 +2037,106 @@ def courier_accounting():
                                     order.courier_fee = 0.0
                                 order.courier_settled = True
                                 settled_count += 1
+                                returned_count += 1
+                                batch_profit -= (order.courier_fee or 0.0)
                                 batch_fee += (order.courier_fee or 0.0)
+                                settled_orders.append(order)
                             
                     if settled_count > 0:
-                        db.session.commit()
-                        
                         net_cash_settled = batch_collected - batch_fee
                         final_cash = net_cash_settled - transfers
+
+                        settlement = CourierSettlement(
+                            courier_id=selected_courier.id,
+                            settled_at=datetime.now(),
+                            total_orders=settled_count,
+                            delivered_count=delivered_count,
+                            returned_count=returned_count,
+                            total_cod=batch_collected,
+                            courier_commission=batch_fee,
+                            company_profit=batch_profit,
+                            transfers=transfers,
+                            net_cash=final_cash,
+                            notes=f'تقفيل شيت مندوب ({settled_count} أوردر)'
+                        )
+                        db.session.add(settlement)
+                        db.session.flush()
+
+                        for o in settled_orders:
+                            o.courier_settlement_id = settlement.id
                         
                         # Add treasury transactions automatically!
                         if transfers > 0:
-                            tx1 = TreasuryTransaction(amount=transfers, method='تحويل', tx_type='تحصيل_من_مندوب', entity_id=selected_courier.id, notes=f'تقفيل شيت مندوب ({settled_count} أوردر)')
+                            tx1 = TreasuryTransaction(amount=transfers, method='تحويل', tx_type='تحصيل_من_مندوب', entity_id=selected_courier.id, notes=f'تقفيل شيت مندوب ({settled_count} أوردر) - تسوية #{settlement.id}')
                             db.session.add(tx1)
                         if final_cash > 0:
-                            tx2 = TreasuryTransaction(amount=final_cash, method='كاش', tx_type='تحصيل_من_مندوب', entity_id=selected_courier.id, notes=f'تقفيل شيت مندوب ({settled_count} أوردر)')
+                            tx2 = TreasuryTransaction(amount=final_cash, method='كاش', tx_type='تحصيل_من_مندوب', entity_id=selected_courier.id, notes=f'تقفيل شيت مندوب ({settled_count} أوردر) - تسوية #{settlement.id}')
                             db.session.add(tx2)
                         elif final_cash < 0:
-                            tx2 = TreasuryTransaction(amount=final_cash, method='كاش', tx_type='صرف_لمندوب', entity_id=selected_courier.id, notes=f'صرف للمندوب عند تقفيل الشيت ({settled_count} أوردر)')
+                            tx2 = TreasuryTransaction(amount=final_cash, method='كاش', tx_type='صرف_لمندوب', entity_id=selected_courier.id, notes=f'صرف للمندوب عند تقفيل الشيت ({settled_count} أوردر) - تسوية #{settlement.id}')
                             db.session.add(tx2)
                             
                         db.session.commit()
                         
-                        flash(f'تم تقفيل {settled_count} أوردر بنجاح! وتم إدراج الدفعات للخزينة.', 'success')
-                        return redirect(url_for('courier_accounting'))
+                        flash(f'تم تقفيل {settled_count} أوردر بنجاح! وحفظ شريط التسوية بالسجل.', 'success')
+                        return redirect(url_for('courier_accounting', courier_id=selected_courier.id))
+
+            # Fetch all historical settlements of this courier
+            all_settlements = CourierSettlement.query.filter_by(courier_id=selected_courier.id).order_by(CourierSettlement.settled_at.desc()).all()
+            
+            # Fetch old settled orders (prior to CourierSettlement system)
+            old_orders = Order.query.filter(
+                Order.courier_id == selected_courier.id,
+                Order.courier_settled == True,
+                Order.courier_settlement_id == None
+            ).all()
+
+            # Build available months
+            arabic_months = {
+                '01': 'يناير', '02': 'فبراير', '03': 'مارس', '04': 'أبريل',
+                '05': 'مايو', '06': 'يونيو', '07': 'يوليو', '08': 'أغسطس',
+                '09': 'سبتمبر', '10': 'أكتوبر', '11': 'نوفمبر', '12': 'ديسمبر'
+            }
+            month_set = set()
+            for s in all_settlements:
+                if s.settled_at:
+                    month_set.add(s.settled_at.strftime('%Y-%m'))
+            for o in old_orders:
+                if o.created_at:
+                    month_set.add(o.created_at.strftime('%Y-%m'))
+            
+            sorted_months = sorted(list(month_set), reverse=True)
+            for m in sorted_months:
+                y, mo = m.split('-')
+                label = f"{arabic_months.get(mo, mo)} {y}"
+                available_months.append({'value': m, 'label': label})
+
+            # Filter settlements by month if selected
+            if selected_month:
+                filtered_settlements = [s for s in all_settlements if s.settled_at and s.settled_at.strftime('%Y-%m') == selected_month]
+                filtered_old = [o for o in old_orders if o.created_at and o.created_at.strftime('%Y-%m') == selected_month]
+            else:
+                filtered_settlements = all_settlements
+                filtered_old = old_orders
+
+            settlements = filtered_settlements
+
+            # Old orders stats:
+            old_profit = 0.0
+            for o in filtered_old:
+                if o.status in ['تم التوصيل', 'تسليم جزئي / مرتجع']:
+                    old_profit += ((o.shipping_fee or 70.0) - (o.courier_fee or 0.0))
+                elif o.status in ['مرتجع', 'مرتجع شركة']:
+                    old_profit -= (o.courier_fee or 0.0)
+
+            stats = {
+                'delivered_count': sum(s.delivered_count for s in filtered_settlements) + sum(1 for o in filtered_old if o.status in ['تم التوصيل', 'تسليم جزئي / مرتجع']),
+                'returned_count': sum(s.returned_count for s in filtered_settlements) + sum(1 for o in filtered_old if o.status in ['مرتجع', 'مرتجع شركة']),
+                'courier_commission': sum(s.courier_commission for s in filtered_settlements) + sum((o.courier_fee or 0.0) for o in filtered_old),
+                'company_profit': sum(s.company_profit for s in filtered_settlements) + old_profit,
+                'total_orders': sum(s.total_orders for s in filtered_settlements) + len(filtered_old),
+                'settlements_count': len(filtered_settlements)
+            }
 
     return render_template(
         'courier_accounting.html', 
@@ -2015,8 +2146,52 @@ def courier_accounting():
         total_cod=total_cod,
         total_commission=total_commission,
         transfers=transfers,
-        net_cash=net_cash
+        net_cash=net_cash,
+        settlements=settlements,
+        available_months=available_months,
+        selected_month=selected_month,
+        stats=stats
     )
+
+@app.route('/api/courier_settlement/<int:settlement_id>')
+def api_courier_settlement(settlement_id):
+    settlement = db.session.get(CourierSettlement, settlement_id)
+    if not settlement:
+        return jsonify({'error': 'Settlement not found'}), 404
+        
+    orders_data = []
+    for o in settlement.orders:
+        orders_data.append({
+            'id': o.id,
+            'tracking_number': o.tracking_number,
+            'client_name': o.client_name or '',
+            'phone': o.phone or '',
+            'address': o.address or '',
+            'region': o.region or '',
+            'cod': o.cod or 0.0,
+            'status': o.status,
+            'collected_amount': o.collected_amount if o.collected_amount is not None else 0.0,
+            'courier_fee': o.courier_fee if o.courier_fee is not None else 0.0,
+            'subtotal': ((o.collected_amount or 0.0) - (o.courier_fee or 0.0)),
+            'shipping_fee': o.shipping_fee or 70.0,
+            'company_name': o.company.name if o.company else ''
+        })
+        
+    return jsonify({
+        'id': settlement.id,
+        'courier_name': settlement.courier.name if settlement.courier else '',
+        'settled_at': settlement.settled_at.strftime('%Y-%m-%d %I:%M %p') if settlement.settled_at else '',
+        'total_orders': settlement.total_orders,
+        'delivered_count': settlement.delivered_count,
+        'returned_count': settlement.returned_count,
+        'total_cod': settlement.total_cod,
+        'courier_commission': settlement.courier_commission,
+        'company_profit': settlement.company_profit,
+        'transfers': settlement.transfers,
+        'net_cash': settlement.net_cash,
+        'notes': settlement.notes or '',
+        'orders': orders_data
+    })
 
 if __name__ == '__main__':
     app.run(debug=True)

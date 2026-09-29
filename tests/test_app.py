@@ -1,6 +1,6 @@
 import pytest
 import os
-from app import app, db, Company, Courier, Order, TreasuryTransaction
+from app import app, db, Company, Courier, Order, TreasuryTransaction, CourierSettlement
 
 @pytest.fixture
 def client():
@@ -1443,5 +1443,123 @@ def test_filter_by_courier_and_company_with_string_params(client):
     res3 = client.get(f'/export_excel?courier_id={cour_id}&status=مع+المندوب')
     assert res3.status_code == 200
     assert res3.mimetype == 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+
+def test_courier_settlement_history_and_stats(client):
+    with app.app_context():
+        comp = Company(name="شركة تسليمات السجل")
+        cour = Courier(name="مندوب تسليمات السجل")
+        db.session.add_all([comp, cour])
+        db.session.commit()
+        cour_id = cour.id
+        comp_id = comp.id
+
+        o1 = Order(
+            tracking_number="TRK-SETTLE-1",
+            client_name="عميل 1",
+            phone="01011111111",
+            cod=300.0,
+            shipping_fee=60.0,
+            status="مع المندوب",
+            company_id=comp_id,
+            courier_id=cour_id
+        )
+        o2 = Order(
+            tracking_number="TRK-SETTLE-2",
+            client_name="عميل 2",
+            phone="01022222222",
+            cod=500.0,
+            shipping_fee=70.0,
+            status="مع المندوب",
+            company_id=comp_id,
+            courier_id=cour_id
+        )
+        o3 = Order(
+            tracking_number="TRK-SETTLE-3",
+            client_name="عميل 3",
+            phone="01033333333",
+            cod=200.0,
+            shipping_fee=50.0,
+            status="مع المندوب",
+            company_id=comp_id,
+            courier_id=cour_id
+        )
+        db.session.add_all([o1, o2, o3])
+        db.session.commit()
+        id1, id2, id3 = o1.id, o2.id, o3.id
+
+    # 1. GET courier accounting page
+    res_get = client.get(f'/accounting/courier?courier_id={cour_id}')
+    assert res_get.status_code == 200
+    text_get = res_get.get_data(as_text=True)
+    assert 'TRK-SETTLE-1' in text_get
+    assert 'TRK-SETTLE-2' in text_get
+    assert 'TRK-SETTLE-3' in text_get
+
+    # 2. Settle the courier batch
+    res_post = client.post(f'/accounting/courier?courier_id={cour_id}', data={
+        'action': 'settle',
+        f'status_{id1}': 'تم التوصيل',
+        f'collected_{id1}': '300',
+        f'courier_fee_{id1}': '35',
+        f'status_{id2}': 'مرتجع',
+        f'collected_{id2}': '0',
+        f'courier_fee_{id2}': '10',
+        f'status_{id3}': 'تسليم جزئي / مرتجع',
+        f'collected_{id3}': '150',
+        f'courier_fee_{id3}': '30',
+        'transfers': '50'
+    }, follow_redirects=True)
+    assert res_post.status_code == 200
+    text_post = res_post.get_data(as_text=True)
+
+    # 3. Verify CourierSettlement record and orders in DB
+    with app.app_context():
+        settlement = CourierSettlement.query.filter_by(courier_id=cour_id).first()
+        assert settlement is not None
+        assert settlement.total_orders == 3
+        assert settlement.delivered_count == 2
+        assert settlement.returned_count == 1
+        assert settlement.total_cod == 450.0 # 300 + 150
+        assert settlement.courier_commission == 75.0 # 35 + 10 + 30
+        assert settlement.transfers == 50.0
+        assert settlement.net_cash == 325.0 # 450 - 75 - 50
+        # Company profit: (60 - 35) + (0 - 10) + (50 - 30) = 25 - 10 + 20 = 35.0
+        assert settlement.company_profit == 35.0
+
+        orders = Order.query.filter(Order.courier_settlement_id == settlement.id).all()
+        assert len(orders) == 3
+        for o in orders:
+            assert o.courier_settled is True
+
+        settlement_id = settlement.id
+        settle_month = settlement.settled_at.strftime('%Y-%m')
+
+    # 4. Check UI response contains settlement bar, stats, and blur
+    assert 'سجل تسليمات وتقفيل المندوب' in text_post
+    assert f'#{settlement_id}' in text_post
+    assert 'blur-sensitive' in text_post
+    assert '35.00' in text_post # profit
+    assert '75.00' in text_post # commission
+
+    # 5. Check API endpoint /api/courier_settlement/<id>
+    api_res = client.get(f'/api/courier_settlement/{settlement_id}')
+    assert api_res.status_code == 200
+    json_data = api_res.get_json()
+    assert json_data['id'] == settlement_id
+    assert json_data['total_orders'] == 3
+    assert json_data['delivered_count'] == 2
+    assert json_data['returned_count'] == 1
+    assert json_data['company_profit'] == 35.0
+    assert len(json_data['orders']) == 3
+
+    # 6. Test month filter
+    res_month = client.get(f'/accounting/courier?courier_id={cour_id}&month={settle_month}')
+    assert res_month.status_code == 200
+    assert f'#{settlement_id}' in res_month.get_data(as_text=True)
+
+    res_empty_month = client.get(f'/accounting/courier?courier_id={cour_id}&month=2020-01')
+    assert res_empty_month.status_code == 200
+    assert f'#{settlement_id}' not in res_empty_month.get_data(as_text=True)
+
 
 
