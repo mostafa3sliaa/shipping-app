@@ -2084,14 +2084,7 @@ def courier_accounting():
             # Fetch all historical settlements of this courier
             all_settlements = CourierSettlement.query.filter_by(courier_id=selected_courier.id).order_by(CourierSettlement.settled_at.desc()).all()
             
-            # Fetch old settled orders (prior to CourierSettlement system)
-            old_orders = Order.query.filter(
-                Order.courier_id == selected_courier.id,
-                Order.courier_settled == True,
-                Order.courier_settlement_id == None
-            ).all()
-
-            # Build available months
+            # Build available months strictly from courier settlements
             arabic_months = {
                 '01': 'يناير', '02': 'فبراير', '03': 'مارس', '04': 'أبريل',
                 '05': 'مايو', '06': 'يونيو', '07': 'يوليو', '08': 'أغسطس',
@@ -2101,9 +2094,6 @@ def courier_accounting():
             for s in all_settlements:
                 if s.settled_at:
                     month_set.add(s.settled_at.strftime('%Y-%m'))
-            for o in old_orders:
-                if o.created_at:
-                    month_set.add(o.created_at.strftime('%Y-%m'))
             
             sorted_months = sorted(list(month_set), reverse=True)
             for m in sorted_months:
@@ -2114,27 +2104,18 @@ def courier_accounting():
             # Filter settlements by month if selected
             if selected_month:
                 filtered_settlements = [s for s in all_settlements if s.settled_at and s.settled_at.strftime('%Y-%m') == selected_month]
-                filtered_old = [o for o in old_orders if o.created_at and o.created_at.strftime('%Y-%m') == selected_month]
             else:
                 filtered_settlements = all_settlements
-                filtered_old = old_orders
 
             settlements = filtered_settlements
 
-            # Old orders stats:
-            old_profit = 0.0
-            for o in filtered_old:
-                if o.status in ['تم التوصيل', 'تسليم جزئي / مرتجع']:
-                    old_profit += ((o.shipping_fee or 70.0) - (o.courier_fee or 0.0))
-                elif o.status in ['مرتجع', 'مرتجع شركة']:
-                    old_profit -= (o.courier_fee or 0.0)
-
+            # Stats start clean from zero based on settlements recorded in the system
             stats = {
-                'delivered_count': sum(s.delivered_count for s in filtered_settlements) + sum(1 for o in filtered_old if o.status in ['تم التوصيل', 'تسليم جزئي / مرتجع']),
-                'returned_count': sum(s.returned_count for s in filtered_settlements) + sum(1 for o in filtered_old if o.status in ['مرتجع', 'مرتجع شركة']),
-                'courier_commission': sum(s.courier_commission for s in filtered_settlements) + sum((o.courier_fee or 0.0) for o in filtered_old),
-                'company_profit': sum(s.company_profit for s in filtered_settlements) + old_profit,
-                'total_orders': sum(s.total_orders for s in filtered_settlements) + len(filtered_old),
+                'delivered_count': sum(s.delivered_count for s in filtered_settlements),
+                'returned_count': sum(s.returned_count for s in filtered_settlements),
+                'courier_commission': sum(s.courier_commission for s in filtered_settlements),
+                'company_profit': sum(s.company_profit for s in filtered_settlements),
+                'total_orders': sum(s.total_orders for s in filtered_settlements),
                 'settlements_count': len(filtered_settlements)
             }
 
