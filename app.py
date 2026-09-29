@@ -2079,7 +2079,7 @@ def courier_accounting():
                         db.session.commit()
                         
                         flash(f'تم تقفيل {settled_count} أوردر بنجاح! وحفظ شريط التسوية بالسجل.', 'success')
-                        return redirect(url_for('courier_accounting', courier_id=selected_courier.id))
+                        return redirect(url_for('courier_accounting', courier_id=selected_courier.id, subtab='history'))
 
             # Fetch all historical settlements of this courier
             all_settlements = CourierSettlement.query.filter_by(courier_id=selected_courier.id).order_by(CourierSettlement.settled_at.desc()).all()
@@ -2138,6 +2138,8 @@ def courier_accounting():
                 'settlements_count': len(filtered_settlements)
             }
 
+    active_tab = request.args.get('subtab', 'history' if selected_month else 'account')
+
     return render_template(
         'courier_accounting.html', 
         couriers=couriers, 
@@ -2150,7 +2152,8 @@ def courier_accounting():
         settlements=settlements,
         available_months=available_months,
         selected_month=selected_month,
-        stats=stats
+        stats=stats,
+        active_tab=active_tab
     )
 
 @app.route('/api/courier_settlement/<int:settlement_id>')

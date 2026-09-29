@@ -28,6 +28,21 @@
     .stat-card:hover {
         transform: translateY(-3px);
     }
+    #courierSubTabs .nav-link {
+        border-radius: 8px;
+        font-size: 1.05rem;
+        color: #212529;
+        background-color: rgba(255, 255, 255, 0.75);
+        transition: all 0.2s ease;
+    }
+    #courierSubTabs .nav-link.active {
+        background-color: #212529 !important;
+        color: #ffc107 !important;
+        border-color: #212529 !important;
+    }
+    #courierSubTabs .nav-link:hover:not(.active) {
+        background-color: #ffffff !important;
+    }
 </style>
 
 <!-- Tabs Navigation -->
@@ -49,7 +64,7 @@
     </li>
     <li class="nav-item">
         <button class="nav-link fw-bold text-dark active px-4 py-3" type="button">
-            <i class="fa-solid fa-motorcycle me-2 text-warning"></i> تقفيل وسجل المندوب
+            <i class="fa-solid fa-motorcycle me-2 text-warning"></i> حساب وسجل المندوب
         </button>
     </li>
     {% if current_user.is_authenticated %}
@@ -62,24 +77,41 @@
 </ul>
 
 <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-warning text-dark py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <h4 class="mb-0 fw-bold"><i class="fa-solid fa-motorcycle me-2"></i> حسابات وسجل تسليمات المناديب</h4>
+    <!-- Yellow Header Bar Containing the Two Tabs -->
+    <div class="card-header bg-warning text-dark py-2 px-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <ul class="nav nav-pills gap-2 mb-0" id="courierSubTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if active_tab != 'history' %}active{% endif %} fw-bold px-4 py-2 border shadow-sm" id="courier-account-tab" data-bs-toggle="pill" data-bs-target="#courier-account" type="button" role="tab" aria-controls="courier-account" aria-selected="{% if active_tab != 'history' %}true{% else %}false{% endif %}">
+                    <i class="fa-solid fa-calculator me-2"></i> حساب المندوب
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if active_tab == 'history' %}active{% endif %} fw-bold px-4 py-2 border shadow-sm" id="courier-history-tab" data-bs-toggle="pill" data-bs-target="#courier-history" type="button" role="tab" aria-controls="courier-history" aria-selected="{% if active_tab == 'history' %}true{% else %}false{% endif %}">
+                    <i class="fa-solid fa-clock-rotate-left me-2"></i> سجل المندوب
+                    {% if selected_courier and settlements %}
+                    <span class="badge bg-danger ms-1">{{ settlements|length }}</span>
+                    {% endif %}
+                </button>
+            </li>
+        </ul>
+
         {% if selected_courier %}
         <div>
             <button type="button" class="btn btn-dark btn-sm fw-bold shadow-sm" onclick="toggleProfitBlur()">
-                <i class="fa-solid fa-eye me-1" id="blurEyeIcon"></i> إظهار/إخفاء الأرباح
+                <i class="fa-solid fa-eye me-1" id="blurEyeIcon"></i> إظهار/إخفاء الأرقام
             </button>
         </div>
         {% endif %}
     </div>
+
     <div class="card-body p-4">
-        
-        <!-- Filter Form: Courier and Month Selection -->
-        <form method="GET" action="{{ url_for('courier_accounting') }}" class="row g-3 align-items-end mb-4 bg-light p-3 rounded border">
+        <!-- Courier Selection Form -->
+        <form method="GET" action="{{ url_for('courier_accounting') }}" class="row g-2 align-items-end mb-4 bg-light p-3 rounded border" id="courierSelectForm">
+            <input type="hidden" name="subtab" id="subtabInput" value="{{ active_tab }}">
             <div class="col-md-5">
-                <label class="form-label fw-bold text-muted"><i class="fa-solid fa-user-tie me-1 text-warning"></i> اختر المندوب:</label>
+                <label class="form-label fw-bold text-muted"><i class="fa-solid fa-user-tie me-1 text-warning"></i> اختر المندوب للتقفيل أو عرض السجل:</label>
                 <select name="courier_id" class="form-select fw-bold" required onchange="this.form.submit()">
-                    <option value="">-- اختر المندوب لتسوية عهدته وعرض سجله --</option>
+                    <option value="">-- اختر المندوب --</option>
                     {% for c in couriers %}
                     <option value="{{ c.id }}" {% if selected_courier and selected_courier.id == c.id %}selected{% endif %}>
                         {{ c.name }}
@@ -87,320 +119,336 @@
                     {% endfor %}
                 </select>
             </div>
-            {% if selected_courier %}
-            <div class="col-md-4">
-                <label class="form-label fw-bold text-muted"><i class="fa-solid fa-calendar-days me-1 text-primary"></i> فلتر الشهر (للإحصائيات والسجل):</label>
-                <select name="month" class="form-select fw-bold border-primary" onchange="this.form.submit()">
-                    <option value="" {% if not selected_month %}selected{% endif %}>📅 كل الشهور (إجمالي شامل قديم وجديد)</option>
-                    {% for m in available_months %}
-                    <option value="{{ m.value }}" {% if selected_month == m.value %}selected{% endif %}>
-                        📅 {{ m.label }}
-                    </option>
-                    {% endfor %}
-                </select>
-            </div>
-            {% endif %}
             <div class="col-md-2">
                 <button type="submit" class="btn btn-warning fw-bold w-100"><i class="fa-solid fa-search"></i> عرض</button>
             </div>
-            {% if selected_courier and selected_month %}
-            <div class="col-md-1">
-                <a href="{{ url_for('courier_accounting', courier_id=selected_courier.id) }}" class="btn btn-outline-secondary fw-bold w-100" title="إلغاء فلتر الشهر">
-                    <i class="fa-solid fa-rotate-left"></i>
-                </a>
-            </div>
-            {% endif %}
         </form>
 
         {% if selected_courier %}
-            <!-- Summary Statistics Cards Row -->
-            <div class="row g-3 mb-4">
-                <!-- Delivered Orders Card -->
-                <div class="col-md-3">
-                    <div class="card stat-card bg-success text-white shadow-sm border-0 h-100">
-                        <div class="card-body p-3">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="fw-bold opacity-75">إجمالي التسليمات</span>
-                                <i class="fa-solid fa-circle-check fa-xl opacity-75"></i>
-                            </div>
-                            <h2 class="fw-bold mb-0">{{ stats.delivered_count }}</h2>
-                            <small class="opacity-75">
-                                {% if selected_month %}
-                                خلال الشهر المختار
-                                {% else %}
-                                كل التسليمات (قديم وجديد)
-                                {% endif %}
-                            </small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Returned Orders Card -->
-                <div class="col-md-3">
-                    <div class="card stat-card bg-danger text-white shadow-sm border-0 h-100">
-                        <div class="card-body p-3">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="fw-bold opacity-75">عدد المرتجعات</span>
-                                <i class="fa-solid fa-rotate-left fa-xl opacity-75"></i>
-                            </div>
-                            <h2 class="fw-bold mb-0">{{ stats.returned_count }}</h2>
-                            <small class="opacity-75">
-                                {% if selected_month %}
-                                مرتجعات الشهر المختار
-                                {% else %}
-                                إجمالي كل المرتجعات
-                                {% endif %}
-                            </small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Courier Commission Card -->
-                <div class="col-md-3">
-                    <div class="card stat-card bg-primary text-white shadow-sm border-0 h-100">
-                        <div class="card-body p-3">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="fw-bold opacity-75">عمولة المندوب</span>
-                                <i class="fa-solid fa-hand-holding-dollar fa-xl opacity-75"></i>
-                            </div>
-                            <h2 class="fw-bold mb-0">{{ "%.2f"|format(stats.courier_commission) }} <span class="fs-6">ج.م</span></h2>
-                            <small class="opacity-75">مستحقات المندوب المسددة</small>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Company Net Profit Card (With Privacy Blur) -->
-                <div class="col-md-3">
-                    <div class="card stat-card bg-dark text-white shadow-sm border-0 h-100 position-relative">
-                        <div class="card-body p-3">
-                            <div class="d-flex justify-content-between align-items-center mb-1">
-                                <span class="fw-bold text-warning">مكسب الشركة منه</span>
-                                <button type="button" class="btn btn-sm btn-outline-warning p-0 px-2" onclick="toggleProfitBlur()" title="إظهار / إخفاء للخصوصية">
-                                    <i class="fa-solid fa-eye small"></i>
-                                </button>
-                            </div>
-                            <h2 class="fw-bold mb-0">
-                                <span class="blur-sensitive text-warning" title="اضغط للإظهار أو الإخفاء">{{ "%.2f"|format(stats.company_profit) }}</span>
-                                <span class="fs-6 text-warning">ج.م</span>
-                            </h2>
-                            <small class="text-white-50">صافي ربح الشركة (فارق الشحن)</small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Active / Open Orders Section -->
-            {% if orders %}
-                <form method="POST" action="{{ url_for('courier_accounting', courier_id=selected_courier.id) }}" id="accountingForm">
-                    <input type="hidden" name="action" value="settle">
-                    
-                    <div class="row mb-3 align-items-center">
-                        <div class="col-md-5">
-                            <h5 class="fw-bold mb-0 text-primary">
-                                <i class="fa-solid fa-clipboard-list me-2"></i> أوردرات العهدة المفتوحة حالياً ({{ orders|length }} أوردر)
-                            </h5>
-                        </div>
-                        <div class="col-md-7 text-end">
-                            <a href="{{ url_for('export_courier_excel', courier_id=selected_courier.id) }}" class="btn btn-sm btn-outline-success fw-bold me-1" data-turbo="false"><i class="fa-solid fa-file-excel"></i> إكسيل</a>
-                            <button type="button" class="btn btn-sm btn-outline-success fw-bold me-3" onclick="copyWhatsAppMessage()"><i class="fa-brands fa-whatsapp"></i> واتس</button>
+            <div class="tab-content" id="courierSubTabsContent">
+                <!-- TAB 1: حساب المندوب (العهدة المفتوحة للتقفيل) -->
+                <div class="tab-pane fade {% if active_tab != 'history' %}show active{% endif %}" id="courier-account" role="tabpanel" aria-labelledby="courier-account-tab">
+                    {% if orders %}
+                        <form method="POST" action="{{ url_for('courier_accounting', courier_id=selected_courier.id) }}" id="accountingForm">
+                            <input type="hidden" name="action" value="settle">
                             
-                            <div class="d-inline-flex align-items-center bg-white border border-primary p-2 rounded shadow-sm">
-                                <label class="fw-bold me-2 text-primary mb-0">توحيد عمولة المندوب:</label>
-                                <div class="input-group input-group-sm" style="width: 150px;">
-                                    <input type="number" id="bulkFeeInput" class="form-control fw-bold" placeholder="مثال: 40">
-                                    <button type="button" class="btn btn-primary fw-bold" onclick="applyBulkFee()">تطبيق</button>
+                            <div class="row mb-3 align-items-center">
+                                <div class="col-md-5">
+                                    <h5 class="fw-bold mb-0 text-primary">
+                                        <i class="fa-solid fa-clipboard-list me-2"></i> أوردرات العهدة المفتوحة ({{ orders|length }} أوردر)
+                                    </h5>
+                                </div>
+                                <div class="col-md-7 text-end">
+                                    <a href="{{ url_for('export_courier_excel', courier_id=selected_courier.id) }}" class="btn btn-sm btn-outline-success fw-bold me-1" data-turbo="false"><i class="fa-solid fa-file-excel"></i> إكسيل</a>
+                                    <button type="button" class="btn btn-sm btn-outline-success fw-bold me-3" onclick="copyWhatsAppMessage()"><i class="fa-brands fa-whatsapp"></i> واتس</button>
+                                    
+                                    <div class="d-inline-flex align-items-center bg-white border border-primary p-2 rounded shadow-sm">
+                                        <label class="fw-bold me-2 text-primary mb-0">توحيد عمولة المندوب:</label>
+                                        <div class="input-group input-group-sm" style="width: 150px;">
+                                            <input type="number" id="bulkFeeInput" class="form-control fw-bold" placeholder="مثال: 40">
+                                            <button type="button" class="btn btn-primary fw-bold" onclick="applyBulkFee()">تطبيق</button>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
 
-                    <div class="table-responsive mb-4">
-                        <table class="table table-hover align-middle border">
-                            <thead class="table-dark">
-                                <tr>
-                                    <th width="12%">البوليصة</th>
-                                    <th width="15%">العميل</th>
-                                    <th width="10%">COD</th>
-                                    <th width="18%">تحديد الحالة النهائية</th>
-                                    <th width="15%">المبلغ المُحصل</th>
-                                    <th width="15%">عمولة المندوب</th>
-                                    <th width="15%">الإجمالي الفرعي</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for order in orders %}
-                                <tr id="row_{{ order.id }}" class="bg-light" data-phone="{{ order.phone }}" data-address="{{ order.address }}" data-content="{{ order.content }}" data-shipping="{{ order.shipping_fee or 0 }}">
-                                    <td class="fw-bold font-monospace text-primary">{{ order.tracking_number }}</td>
-                                    <td>{{ order.client_name }}</td>
-                                    <td class="fw-bold" id="cod_{{ order.id }}" data-val="{{ order.cod }}">{{ order.cod }}</td>
-                                    <td>
-                                        <select name="status_{{ order.id }}" id="status_{{ order.id }}" class="form-select form-select-sm fw-bold status-select" onchange="updateRow('{{ order.id }}', true)">
-                                            <option value="مع المندوب">لم يُسلم بعد (مع المندوب)</option>
-                                            <option value="تم التوصيل" {% if order.status in ['تم التوصيل', 'مع المندوب'] %}selected{% endif %}>تم التوصيل</option>
-                                            <option value="تسليم جزئي / مرتجع" {% if order.status == 'تسليم جزئي / مرتجع' %}selected{% endif %}>تسليم جزئي / مرتجع</option>
-                                            <option value="مرتجع_مخزن">مرتجع للمخزن (بدون رسوم - هيطلع تاني)</option>
-                                            <option value="مرتجع" {% if order.status == 'مرتجع' %}selected{% endif %}>مرتجع نهائي (بدون رسوم)</option>
-                                            <option value="مرتجع بشحن" {% if order.status == 'مرتجع بشحن' %}selected{% endif %}>مرتجع (بتحصيل شحن)</option>
-                                        </select>
-                                    </td>
-                                    <td>
-                                        <div class="input-group input-group-sm">
-                                            <input type="number" step="0.01" name="collected_{{ order.id }}" id="collected_{{ order.id }}" class="form-control text-success fw-bold" value="{{ order.collected_amount if (order.collected_amount is not none and order.collected_amount > 0) else (order.cod if order.status in ['تم التوصيل', 'مع المندوب'] else '0') }}" oninput="updateTotals()">
-                                        </div>
-                                    </td>
-                                    <td>
-                                        <div class="input-group input-group-sm">
-                                            <input type="number" step="0.01" name="courier_fee_{{ order.id }}" id="courier_fee_{{ order.id }}" class="form-control text-danger fw-bold fee-input" value="0" oninput="updateTotals()">
-                                        </div>
-                                    </td>
-                                    <td class="fw-bold fs-5">
-                                        <span id="subtotal_{{ order.id }}">0.00</span>
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-
-                    <!-- Totals and Final Settlement -->
-                    <div class="row justify-content-end mb-5">
-                        <div class="col-md-5">
-                            <div class="card shadow-sm border-primary">
-                                <div class="card-header bg-primary text-white py-3">
-                                    <h5 class="mb-0 fw-bold"><i class="fa-solid fa-file-invoice-dollar me-2"></i> إجمالي التقفيل لهذه العهدة</h5>
-                                </div>
-                                <div class="card-body bg-white p-4">
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span class="fw-bold">إجمالي الأوردرات المُقفلة:</span>
-                                        <span class="text-dark fw-bold"><span id="settledCount">0</span> أوردر</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span class="fw-bold">إجمالي المبالغ المُحصلة:</span>
-                                        <span class="text-success fw-bold"><span id="totalCollected">0.00</span> ج.م</span>
-                                    </div>
-                                    <div class="d-flex justify-content-between mb-2">
-                                        <span class="fw-bold">إجمالي عمولة المندوب:</span>
-                                        <span class="text-primary fw-bold">- <span id="totalFee">0.00</span> ج.م</span>
-                                    </div>
-                                    <hr>
-                                    <div class="d-flex justify-content-between mb-3 fs-5">
-                                        <span class="fw-bold">الصافي المطلوب من المندوب:</span>
-                                        <span class="text-danger fw-bold"><span id="netCash">0.00</span> ج.م</span>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label class="form-label fw-bold text-muted">خصم تحويلات بنكية / فودافون كاش (إن وُجدت):</label>
-                                        <div class="input-group">
-                                            <input type="number" step="0.01" name="transfers" id="transfersInput" class="form-control fw-bold border-danger" value="0" oninput="updateTotals()">
-                                            <span class="input-group-text bg-danger text-white">ج.م</span>
-                                        </div>
-                                    </div>
-
-                                    <div class="d-flex justify-content-between border-top pt-3 fs-3 mb-4">
-                                        <span class="fw-bold text-success">الكاش الفعلي المستلم:</span>
-                                        <span class="text-success fw-bold"><span id="finalCash">0.00</span> ج.م</span>
-                                    </div>
-
-                                    <button type="submit" class="btn btn-warning btn-lg w-100 fw-bold" onclick="return confirm('سيتم تقفيل الأوردرات المحددة وحفظ شريط التسوية بالسجل. هل أنت متأكد من استلام النقدية؟');">
-                                        <i class="fa-solid fa-lock me-2"></i> تقفيل حساب المندوب وحفظ بالسجل
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </form>
-            {% else %}
-                <div class="alert alert-info d-flex align-items-center p-3 mb-4 rounded shadow-sm">
-                    <i class="fa-solid fa-circle-info fa-2x me-3 text-info"></i>
-                    <div>
-                        <h6 class="fw-bold mb-1">لا توجد أوردرات مفتوحة حالياً في عهدة هذا المندوب.</h6>
-                        <span class="small text-muted">يمكنك مراجعة سجل التقفيلات والتسليمات السابقة بالأسفل، أو إسناد أوردرات جديدة له من شاشة الأوردرات.</span>
-                    </div>
-                </div>
-            {% endif %}
-
-            <!-- Historical Settlement Log Section -->
-            <div class="card shadow-sm border-0 mt-5">
-                <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
-                    <div>
-                        <h5 class="mb-0 fw-bold">
-                            <i class="fa-solid fa-clock-rotate-left text-warning me-2"></i> سجل تسليمات وتقفيل المندوب (المحفوظة)
-                            <span class="badge bg-primary ms-2">{{ settlements|length }} شيت تقفيل</span>
-                        </h5>
-                    </div>
-                    <div class="small text-white-50">
-                        اضغط على أي شريط تقفيل لمراجعة تفاصيل وأوردرات الشيت بالكامل (للقراءة فقط)
-                    </div>
-                </div>
-                <div class="card-body p-3 bg-light">
-                    {% if settlements %}
-                        <div class="list-group gap-2">
-                            {% for s in settlements %}
-                            <div class="list-group-item list-group-item-action p-3 rounded border shadow-sm settlement-bar bg-white" onclick="openSettlementPreviewModal({{ s.id }})" style="cursor: pointer;" title="اضغط لعرض تفاصيل وأوردرات هذا التقفيل">
-                                <div class="row align-items-center g-2 text-center text-md-start">
-                                    <!-- Date and Settlement ID -->
-                                    <div class="col-md-3">
-                                        <div class="d-flex align-items-center justify-content-center justify-content-md-start">
-                                            <div class="badge bg-dark fs-6 p-2 me-2">#{{ s.id }}</div>
-                                            <div>
-                                                <div class="fw-bold text-primary">
-                                                    <i class="fa-regular fa-calendar-check me-1"></i> {{ s.settled_at.strftime('%Y-%m-%d %I:%M %p') }}
+                            <div class="table-responsive mb-4">
+                                <table class="table table-hover align-middle border">
+                                    <thead class="table-dark">
+                                        <tr>
+                                            <th width="12%">البوليصة</th>
+                                            <th width="15%">العميل</th>
+                                            <th width="10%">COD</th>
+                                            <th width="18%">تحديد الحالة النهائية</th>
+                                            <th width="15%">المبلغ المُحصل</th>
+                                            <th width="15%">عمولة المندوب</th>
+                                            <th width="15%">الإجمالي الفرعي</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for order in orders %}
+                                        <tr id="row_{{ order.id }}" class="bg-light" data-phone="{{ order.phone }}" data-address="{{ order.address }}" data-content="{{ order.content }}" data-shipping="{{ order.shipping_fee or 0 }}">
+                                            <td class="fw-bold font-monospace text-primary">{{ order.tracking_number }}</td>
+                                            <td>{{ order.client_name }}</td>
+                                            <td class="fw-bold" id="cod_{{ order.id }}" data-val="{{ order.cod }}">{{ order.cod }}</td>
+                                            <td>
+                                                <select name="status_{{ order.id }}" id="status_{{ order.id }}" class="form-select form-select-sm fw-bold status-select" onchange="updateRow('{{ order.id }}', true)">
+                                                    <option value="مع المندوب">لم يُسلم بعد (مع المندوب)</option>
+                                                    <option value="تم التوصيل" {% if order.status in ['تم التوصيل', 'مع المندوب'] %}selected{% endif %}>تم التوصيل</option>
+                                                    <option value="تسليم جزئي / مرتجع" {% if order.status == 'تسليم جزئي / مرتجع' %}selected{% endif %}>تسليم جزئي / مرتجع</option>
+                                                    <option value="مرتجع_مخزن">مرتجع للمخزن (بدون رسوم - هيطلع تاني)</option>
+                                                    <option value="مرتجع" {% if order.status == 'مرتجع' %}selected{% endif %}>مرتجع نهائي (بدون رسوم)</option>
+                                                    <option value="مرتجع بشحن" {% if order.status == 'مرتجع بشحن' %}selected{% endif %}>مرتجع (بتحصيل شحن)</option>
+                                                </select>
+                                            </td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" step="0.01" name="collected_{{ order.id }}" id="collected_{{ order.id }}" class="form-control text-success fw-bold" value="{{ order.collected_amount if (order.collected_amount is not none and order.collected_amount > 0) else (order.cod if order.status in ['تم التوصيل', 'مع المندوب'] else '0') }}" oninput="updateTotals()">
                                                 </div>
-                                                <small class="text-muted"><i class="fa-solid fa-motorcycle me-1"></i> {{ selected_courier.name }}</small>
+                                            </td>
+                                            <td>
+                                                <div class="input-group input-group-sm">
+                                                    <input type="number" step="0.01" name="courier_fee_{{ order.id }}" id="courier_fee_{{ order.id }}" class="form-control text-danger fw-bold fee-input" value="0" oninput="updateTotals()">
+                                                </div>
+                                            </td>
+                                            <td class="fw-bold fs-5">
+                                                <span id="subtotal_{{ order.id }}">0.00</span>
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <!-- Totals and Final Settlement -->
+                            <div class="row justify-content-end mb-4">
+                                <div class="col-md-5">
+                                    <div class="card shadow-sm border-primary">
+                                        <div class="card-header bg-primary text-white py-3">
+                                            <h5 class="mb-0 fw-bold"><i class="fa-solid fa-file-invoice-dollar me-2"></i> إجمالي التقفيل لهذه العهدة</h5>
+                                        </div>
+                                        <div class="card-body bg-white p-4">
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span class="fw-bold">إجمالي الأوردرات المُقفلة:</span>
+                                                <span class="text-dark fw-bold"><span id="settledCount">0</span> أوردر</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span class="fw-bold">إجمالي المبالغ المُحصلة:</span>
+                                                <span class="text-success fw-bold"><span id="totalCollected">0.00</span> ج.م</span>
+                                            </div>
+                                            <div class="d-flex justify-content-between mb-2">
+                                                <span class="fw-bold">إجمالي عمولة المندوب:</span>
+                                                <span class="text-primary fw-bold">- <span id="totalFee">0.00</span> ج.م</span>
+                                            </div>
+                                            <hr>
+                                            <div class="d-flex justify-content-between mb-3 fs-5">
+                                                <span class="fw-bold">الصافي المطلوب من المندوب:</span>
+                                                <span class="text-danger fw-bold"><span id="netCash">0.00</span> ج.م</span>
+                                            </div>
+
+                                            <div class="mb-3">
+                                                <label class="form-label fw-bold text-muted">خصم تحويلات بنكية / فودافون كاش (إن وُجدت):</label>
+                                                <div class="input-group">
+                                                    <input type="number" step="0.01" name="transfers" id="transfersInput" class="form-control fw-bold border-danger" value="0" oninput="updateTotals()">
+                                                    <span class="input-group-text bg-danger text-white">ج.م</span>
+                                                </div>
+                                            </div>
+
+                                            <div class="d-flex justify-content-between border-top pt-3 fs-3 mb-4">
+                                                <span class="fw-bold text-success">الكاش الفعلي المستلم:</span>
+                                                <span class="text-success fw-bold"><span id="finalCash">0.00</span> ج.م</span>
+                                            </div>
+
+                                            <button type="submit" class="btn btn-warning btn-lg w-100 fw-bold" onclick="return confirm('سيتم تقفيل الأوردرات المحددة وحفظ شريط التسوية بالسجل. هل أنت متأكد من استلام النقدية؟');">
+                                                <i class="fa-solid fa-lock me-2"></i> تقفيل حساب المندوب وحفظ بالسجل
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </form>
+                    {% else %}
+                        <div class="text-center py-5 bg-light rounded border">
+                            <i class="fa-solid fa-face-smile-wink fa-4x text-success mb-3 opacity-50"></i>
+                            <h4 class="fw-bold text-dark">لا توجد أوردرات مفتوحة حالياً في عهدة هذا المندوب.</h4>
+                            <p class="text-muted">قم بتسليم أوردرات للمندوب من شريط الإجراءات لتبدأ عهدته، أو انتقل إلى تبويب "سجل المندوب" لمراجعة التقفيلات السابقة.</p>
+                            <button type="button" class="btn btn-primary fw-bold mt-2" onclick="switchToHistoryTab()">
+                                <i class="fa-solid fa-clock-rotate-left me-1"></i> الانتقال إلى سجل المندوب
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+
+                <!-- TAB 2: سجل المندوب والكروت العلوية -->
+                <div class="tab-pane fade {% if active_tab == 'history' %}show active{% endif %}" id="courier-history" role="tabpanel" aria-labelledby="courier-history-tab">
+                    <!-- Month Filter -->
+                    <form method="GET" action="{{ url_for('courier_accounting') }}" class="row g-2 align-items-end mb-4 bg-white p-3 rounded border shadow-sm">
+                        <input type="hidden" name="courier_id" value="{{ selected_courier.id }}">
+                        <input type="hidden" name="subtab" value="history">
+                        <div class="col-md-5">
+                            <label class="form-label fw-bold text-muted"><i class="fa-solid fa-calendar-days me-1 text-primary"></i> فلتر تاريخ الشهر (للكروت وسجل التقفيل):</label>
+                            <select name="month" class="form-select fw-bold border-primary" onchange="this.form.submit()">
+                                <option value="" {% if not selected_month %}selected{% endif %}>📅 كل الشهور (إجمالي شامل قديم وجديد)</option>
+                                {% for m in available_months %}
+                                <option value="{{ m.value }}" {% if selected_month == m.value %}selected{% endif %}>
+                                    📅 {{ m.label }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button type="submit" class="btn btn-primary fw-bold w-100"><i class="fa-solid fa-filter"></i> تطبيق الفلتر</button>
+                        </div>
+                        {% if selected_month %}
+                        <div class="col-md-2">
+                            <a href="{{ url_for('courier_accounting', courier_id=selected_courier.id, subtab='history') }}" class="btn btn-outline-secondary fw-bold w-100">
+                                <i class="fa-solid fa-rotate-left me-1"></i> كل الشهور
+                            </a>
+                        </div>
+                        {% endif %}
+                    </form>
+
+                    <!-- Summary Statistics Cards Row -->
+                    <div class="row g-3 mb-4">
+                        <!-- Delivered Orders Card -->
+                        <div class="col-md-3">
+                            <div class="card stat-card bg-success text-white shadow-sm border-0 h-100">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold opacity-75">إجمالي التسليمات</span>
+                                        <i class="fa-solid fa-circle-check fa-xl opacity-75"></i>
+                                    </div>
+                                    <h2 class="fw-bold mb-0">{{ stats.delivered_count }}</h2>
+                                    <small class="opacity-75">
+                                        {% if selected_month %}
+                                        خلال الشهر المختار
+                                        {% else %}
+                                        كل التسليمات (قديم وجديد)
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Returned Orders Card -->
+                        <div class="col-md-3">
+                            <div class="card stat-card bg-danger text-white shadow-sm border-0 h-100">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold opacity-75">عدد المرتجعات</span>
+                                        <i class="fa-solid fa-rotate-left fa-xl opacity-75"></i>
+                                    </div>
+                                    <h2 class="fw-bold mb-0">{{ stats.returned_count }}</h2>
+                                    <small class="opacity-75">
+                                        {% if selected_month %}
+                                        مرتجعات الشهر المختار
+                                        {% else %}
+                                        إجمالي كل المرتجعات
+                                        {% endif %}
+                                    </small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Courier Commission Card -->
+                        <div class="col-md-3">
+                            <div class="card stat-card bg-primary text-white shadow-sm border-0 h-100">
+                                <div class="card-body p-3">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="fw-bold opacity-75">عمولة المندوب</span>
+                                        <i class="fa-solid fa-hand-holding-dollar fa-xl opacity-75"></i>
+                                    </div>
+                                    <h2 class="fw-bold mb-0">{{ "%.2f"|format(stats.courier_commission) }} <span class="fs-6">ج.م</span></h2>
+                                    <small class="opacity-75">مستحقات المندوب المسددة</small>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Discreet Fourth Card: Only the Number with Blur & Eye Toggle (No revealing labels) -->
+                        <div class="col-md-3">
+                            <div class="card stat-card bg-dark text-white shadow-sm border-0 h-100">
+                                <div class="card-body p-3 d-flex flex-column justify-content-between">
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <span class="text-secondary"><i class="fa-solid fa-shield-halved text-warning"></i></span>
+                                        <button type="button" class="btn btn-sm btn-outline-warning p-0 px-2" onclick="toggleProfitBlur()" title="إظهار / إخفاء">
+                                            <i class="fa-solid fa-eye small"></i>
+                                        </button>
+                                    </div>
+                                    <div>
+                                        <h2 class="fw-bold mb-0">
+                                            <span class="blur-sensitive text-warning" title="اضغط للإظهار أو الإخفاء">{{ "%.2f"|format(stats.company_profit) }}</span>
+                                            <span class="fs-6 text-warning">ج.م</span>
+                                        </h2>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Historical Settlement Log Section -->
+                    <div class="card shadow-sm border-0">
+                        <div class="card-header bg-dark text-white py-3 d-flex justify-content-between align-items-center flex-wrap gap-2">
+                            <div>
+                                <h5 class="mb-0 fw-bold">
+                                    <i class="fa-solid fa-clock-rotate-left text-warning me-2"></i> سجل تسليمات وتقفيل المندوب (المحفوظة)
+                                    <span class="badge bg-primary ms-2">{{ settlements|length }} شيت تقفيل</span>
+                                </h5>
+                            </div>
+                            <div class="small text-white-50">
+                                اضغط على أي شريط لمراجعة أوردرات وحساب الشيت (للقراءة فقط)
+                            </div>
+                        </div>
+                        <div class="card-body p-3 bg-light">
+                            {% if settlements %}
+                                <div class="list-group gap-2">
+                                    {% for s in settlements %}
+                                    <div class="list-group-item list-group-item-action p-3 rounded border shadow-sm settlement-bar bg-white" onclick="openSettlementPreviewModal({{ s.id }})" style="cursor: pointer;" title="اضغط لعرض تفاصيل وأوردرات هذا التقفيل">
+                                        <div class="row align-items-center g-2 text-center text-md-start">
+                                            <!-- Date and Settlement ID -->
+                                            <div class="col-md-3">
+                                                <div class="d-flex align-items-center justify-content-center justify-content-md-start">
+                                                    <div class="badge bg-dark fs-6 p-2 me-2">#{{ s.id }}</div>
+                                                    <div>
+                                                        <div class="fw-bold text-primary">
+                                                            <i class="fa-regular fa-calendar-check me-1"></i> {{ s.settled_at.strftime('%Y-%m-%d %I:%M %p') }}
+                                                        </div>
+                                                        <small class="text-muted"><i class="fa-solid fa-motorcycle me-1"></i> {{ selected_courier.name }}</small>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            
+                                            <!-- Total Out -->
+                                            <div class="col-md-2 text-center">
+                                                <span class="text-muted d-block small mb-1">العدد اللي طلع بيه</span>
+                                                <span class="badge bg-secondary fs-6 px-3 py-1">
+                                                    <i class="fa-solid fa-boxes-stacked me-1"></i> {{ s.total_orders }} أوردر
+                                                </span>
+                                            </div>
+
+                                            <!-- Returns & Deliveries -->
+                                            <div class="col-md-2 text-center">
+                                                <span class="text-muted d-block small mb-1">سَلّم / رجّع</span>
+                                                <span class="badge bg-success fs-6 px-2 py-1 me-1" title="تم تسليمه">
+                                                    <i class="fa-solid fa-check me-1"></i> {{ s.delivered_count }}
+                                                </span>
+                                                <span class="badge bg-danger fs-6 px-2 py-1" title="المرتجع اللي رجع بيه">
+                                                    <i class="fa-solid fa-rotate-left me-1"></i> {{ s.returned_count }}
+                                                </span>
+                                            </div>
+
+                                            <!-- Courier Commission -->
+                                            <div class="col-md-2 text-center">
+                                                <span class="text-muted d-block small mb-1">عمولة المندوب</span>
+                                                <span class="fw-bold text-danger fs-6">{{ "%.2f"|format(s.courier_commission) }} ج.م</span>
+                                            </div>
+
+                                            <!-- Fourth Discreet Column (Blurred number only with shield icon) -->
+                                            <div class="col-md-2 text-center">
+                                                <span class="text-muted d-block small mb-1"><i class="fa-solid fa-shield-halved me-1"></i></span>
+                                                <span class="fw-bold text-success fs-6 blur-sensitive" title="اضغط للإظهار أو الإخفاء">
+                                                    {{ "%.2f"|format(s.company_profit) }} ج.م
+                                                </span>
+                                            </div>
+
+                                            <!-- Review Action Button -->
+                                            <div class="col-md-1 text-center text-md-end">
+                                                <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="event.stopPropagation(); openSettlementPreviewModal({{ s.id }});">
+                                                    <i class="fa-solid fa-eye me-1"></i> مراجعة
+                                                </button>
                                             </div>
                                         </div>
                                     </div>
-                                    
-                                    <!-- Total Out -->
-                                    <div class="col-md-2 text-center">
-                                        <span class="text-muted d-block small mb-1">العدد اللي طلع بيه</span>
-                                        <span class="badge bg-secondary fs-6 px-3 py-1">
-                                            <i class="fa-solid fa-boxes-stacked me-1"></i> {{ s.total_orders }} أوردر
-                                        </span>
-                                    </div>
-
-                                    <!-- Returns & Deliveries -->
-                                    <div class="col-md-2 text-center">
-                                        <span class="text-muted d-block small mb-1">سَلّم / رجّع</span>
-                                        <span class="badge bg-success fs-6 px-2 py-1 me-1" title="تم تسليمه">
-                                            <i class="fa-solid fa-check me-1"></i> {{ s.delivered_count }}
-                                        </span>
-                                        <span class="badge bg-danger fs-6 px-2 py-1" title="المرتجع اللي رجع بيه">
-                                            <i class="fa-solid fa-rotate-left me-1"></i> {{ s.returned_count }}
-                                        </span>
-                                    </div>
-
-                                    <!-- Courier Commission -->
-                                    <div class="col-md-2 text-center">
-                                        <span class="text-muted d-block small mb-1">عمولة المندوب</span>
-                                        <span class="fw-bold text-danger fs-6">{{ "%.2f"|format(s.courier_commission) }} ج.م</span>
-                                    </div>
-
-                                    <!-- Company Profit (Blurred) -->
-                                    <div class="col-md-2 text-center">
-                                        <span class="text-muted d-block small mb-1">المكسب منه</span>
-                                        <span class="fw-bold text-success fs-6 blur-sensitive" title="اضغط لإظهار/إخفاء المكسب">
-                                            {{ "%.2f"|format(s.company_profit) }} ج.م
-                                        </span>
-                                    </div>
-
-                                    <!-- Review Action Button -->
-                                    <div class="col-md-1 text-center text-md-end">
-                                        <button type="button" class="btn btn-sm btn-outline-primary fw-bold" onclick="event.stopPropagation(); openSettlementPreviewModal({{ s.id }});">
-                                            <i class="fa-solid fa-eye me-1"></i> مراجعة
-                                        </button>
-                                    </div>
+                                    {% endfor %}
                                 </div>
-                            </div>
-                            {% endfor %}
+                            {% else %}
+                                <div class="text-center py-5">
+                                    <i class="fa-solid fa-file-circle-question fa-3x text-muted mb-3 opacity-50"></i>
+                                    <h5 class="fw-bold text-muted">لا يوجد سجل تسليمات مسجل لهذا المندوب {% if selected_month %}في هذا الشهر{% endif %}.</h5>
+                                    <p class="text-muted small mb-0">عند تقفيل أي عهدة للمندوب سيتم إنشاء شريط تسوية تلقائياً وحفظه هنا للمراجعة في أي وقت.</p>
+                                </div>
+                            {% endif %}
                         </div>
-                    {% else %}
-                        <div class="text-center py-5">
-                            <i class="fa-solid fa-file-circle-question fa-3x text-muted mb-3 opacity-50"></i>
-                            <h5 class="fw-bold text-muted">لا يوجد سجل تسليمات مسجل لهذا المندوب {% if selected_month %}في هذا الشهر{% endif %}.</h5>
-                            <p class="text-muted small mb-0">عند تقفيل أي عهدة للمندوب سيتم إنشاء شريط تسوية تلقائياً وحفظه هنا للمراجعة في أي وقت.</p>
-                        </div>
-                    {% endif %}
+                    </div>
                 </div>
             </div>
 
@@ -430,11 +478,35 @@
                 </div>
             </div>
 
+        {% else %}
+            <div class="text-center py-5 text-muted">
+                <i class="fa-solid fa-motorcycle fa-4x mb-3 text-warning opacity-50"></i>
+                <h5 class="fw-bold">يرجى اختيار المندوب من القائمة أعلاه لعرض حسابه أو سجله.</h5>
+            </div>
         {% endif %}
     </div>
 </div>
 
 <script>
+    // Tab switching helpers
+    function switchToHistoryTab() {
+        const historyTabBtn = document.getElementById('courier-history-tab');
+        if (historyTabBtn) {
+            new bootstrap.Tab(historyTabBtn).show();
+        }
+    }
+
+    // Keep subtab input synced
+    document.querySelectorAll('#courierSubTabs button').forEach(btn => {
+        btn.addEventListener('shown.bs.tab', function(e) {
+            const target = e.target.getAttribute('data-bs-target');
+            const subtabInput = document.getElementById('subtabInput');
+            if (subtabInput) {
+                subtabInput.value = (target === '#courier-history') ? 'history' : 'account';
+            }
+        });
+    });
+
     // Privacy Blur Toggle Functions
     function toggleProfitBlur() {
         const blurredEls = document.querySelectorAll('.blur-sensitive');
@@ -538,7 +610,7 @@
                             <span class="fw-bold text-danger fs-6">${data.courier_commission.toFixed(2)} ج.م</span>
                         </div>
                         <div class="col-md-3 text-center border-start">
-                            <span class="text-muted small d-block">مكسب الشركة منه:</span>
+                            <span class="text-muted small d-block"><i class="fa-solid fa-shield-halved me-1 text-primary"></i></span>
                             <span class="fw-bold text-primary fs-6 blur-sensitive" title="اضغط للإظهار أو الإخفاء">${data.company_profit.toFixed(2)} ج.م</span>
                         </div>
                     </div>
