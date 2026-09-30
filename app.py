@@ -1182,6 +1182,7 @@ def scan():
                 if order.status == 'تم التوصيل' and order.courier_settled:
                     reverse_order_treasury_collection(order, reason='تحويل لمرتجع شركة عبر الباركود')
                 order.status = 'مرتجع شركة'
+                order.courier_settled = True
                 db.session.commit()
                 flash(f'تم تحويل الأوردر {tracking_number} لمرتجع شركة', 'dark')
             elif action == 'return':
@@ -1282,6 +1283,7 @@ def bulk_action():
                 order.collected_amount = None
                 order.courier_fee = None
             order.status = 'مرتجع شركة'
+            order.courier_settled = True
         updated_details.append('الحالة: مرتجع شركة')
     elif action == 'delivered':
         for order in orders_to_update:
@@ -1428,6 +1430,7 @@ def edit_order(order_id):
     elif new_status == 'مرتجع شركة':
         if old_settled and old_net > 0 and old_status == 'تم التوصيل':
             reverse_order_treasury_collection(order, reason='تحويل لمرتجع شركة', amount=old_net)
+        order.courier_settled = True
     
     db.session.commit()
     flash('تم تعديل الأوردر بنجاح', 'success')
@@ -1973,10 +1976,11 @@ def courier_accounting():
     if selected_courier_id:
         selected_courier = db.session.get(Courier, int(selected_courier_id)) if str(selected_courier_id).isdigit() else None
         if selected_courier:
-            # Fetch orders that are NOT settled yet.
+            # Fetch orders that are NOT settled yet and actively with courier.
             orders = Order.query.options(joinedload(Order.company)).filter(
                 Order.courier_id == selected_courier.id,
                 Order.courier_settled == False,
+                ~Order.status.in_(['مرتجع شركة', 'مخزن'])
             ).all()
             
             if request.method == 'POST':
