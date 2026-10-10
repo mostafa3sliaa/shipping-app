@@ -121,6 +121,21 @@ class Order(db.Model):
     courier_settlement = db.relationship('CourierSettlement', backref=db.backref('orders', lazy=True))
 
 
+class CourierSettlementOrder(db.Model):
+    __tablename__ = 'courier_settlement_order'
+    id = db.Column(db.Integer, primary_key=True)
+    settlement_id = db.Column(db.Integer, db.ForeignKey('courier_settlement.id', ondelete='CASCADE'), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey('order.id', ondelete='CASCADE'), nullable=False)
+    status = db.Column(db.String(50))
+    collected_amount = db.Column(db.Float, default=0.0)
+    courier_fee = db.Column(db.Float, default=0.0)
+    shipping_fee = db.Column(db.Float, default=70.0)
+    cod = db.Column(db.Float, default=0.0)
+
+    settlement = db.relationship('CourierSettlement', backref=db.backref('settlement_items', lazy=True, cascade='all, delete-orphan'))
+    order = db.relationship('Order', backref=db.backref('settlement_history', lazy=True))
+
+
 class TreasuryTransaction(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     amount = db.Column(db.Float, default=0.0)
@@ -240,6 +255,23 @@ with app.app_context():
                 db.session.commit()
             except Exception:
                 db.session.rollback()
+
+        try:
+            db.session.execute(text('''
+                CREATE TABLE IF NOT EXISTS courier_settlement_order (
+                    id SERIAL PRIMARY KEY,
+                    settlement_id INTEGER NOT NULL REFERENCES courier_settlement(id) ON DELETE CASCADE,
+                    order_id INTEGER NOT NULL REFERENCES "order"(id) ON DELETE CASCADE,
+                    status VARCHAR(50),
+                    collected_amount FLOAT DEFAULT 0.0,
+                    courier_fee FLOAT DEFAULT 0.0,
+                    shipping_fee FLOAT DEFAULT 70.0,
+                    cod FLOAT DEFAULT 0.0
+                );
+            '''))
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
 
         if not User.query.filter_by(username='admin').first():
             hashed = generate_password_hash('admin123')
@@ -2068,6 +2100,16 @@ def courier_accounting():
 
                         for o in settled_orders:
                             o.courier_settlement_id = settlement.id
+                            s_item = CourierSettlementOrder(
+                                settlement_id=settlement.id,
+                                order_id=o.id,
+                                status=o.status,
+                                collected_amount=o.collected_amount if o.collected_amount is not None else 0.0,
+                                courier_fee=o.courier_fee if o.courier_fee is not None else 0.0,
+                                shipping_fee=o.shipping_fee or 70.0,
+                                cod=o.cod or 0.0
+                            )
+                            db.session.add(s_item)
                         
                         # Add treasury transactions automatically!
                         if transfers > 0:
@@ -2148,22 +2190,41 @@ def api_courier_settlement(settlement_id):
         return jsonify({'error': 'Settlement not found'}), 404
         
     orders_data = []
-    for o in settlement.orders:
-        orders_data.append({
-            'id': o.id,
-            'tracking_number': o.tracking_number,
-            'client_name': o.client_name or '',
-            'phone': o.phone or '',
-            'address': o.address or '',
-            'region': o.region or '',
-            'cod': o.cod or 0.0,
-            'status': o.status,
-            'collected_amount': o.collected_amount if o.collected_amount is not None else 0.0,
-            'courier_fee': o.courier_fee if o.courier_fee is not None else 0.0,
-            'subtotal': ((o.collected_amount or 0.0) - (o.courier_fee or 0.0)),
-            'shipping_fee': o.shipping_fee or 70.0,
-            'company_name': o.company.name if o.company else ''
-        })
+    if settlement.settlement_items:
+        for item in settlement.settlement_items:
+            o = item.order
+            orders_data.append({
+                'id': o.id if o else item.order_id,
+                'tracking_number': o.tracking_number if o else f'ORD-{item.order_id}',
+                'client_name': (o.client_name if o else '') or '',
+                'phone': (o.phone if o else '') or '',
+                'address': (o.address if o else '') or '',
+                'region': (o.region if o else '') or '',
+                'cod': item.cod if item.cod is not None else (o.cod if o else 0.0),
+                'status': item.status or (o.status if o else ''),
+                'collected_amount': item.collected_amount if item.collected_amount is not None else 0.0,
+                'courier_fee': item.courier_fee if item.courier_fee is not None else 0.0,
+                'subtotal': ((item.collected_amount or 0.0) - (item.courier_fee or 0.0)),
+                'shipping_fee': item.shipping_fee if item.shipping_fee is not None else (o.shipping_fee if o else 70.0),
+                'company_name': (o.company.name if o and o.company else '')
+            })
+    else:
+        for o in settlement.orders:
+            orders_data.append({
+                'id': o.id,
+                'tracking_number': o.tracking_number,
+                'client_name': o.client_name or '',
+                'phone': o.phone or '',
+                'address': o.address or '',
+                'region': o.region or '',
+                'cod': o.cod or 0.0,
+                'status': o.status,
+                'collected_amount': o.collected_amount if o.collected_amount is not None else 0.0,
+                'courier_fee': o.courier_fee if o.courier_fee is not None else 0.0,
+                'subtotal': ((o.collected_amount or 0.0) - (o.courier_fee or 0.0)),
+                'shipping_fee': o.shipping_fee or 70.0,
+                'company_name': o.company.name if o.company else ''
+            })
         
     return jsonify({
         'id': settlement.id,

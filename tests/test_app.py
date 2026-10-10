@@ -1,5 +1,6 @@
 import pytest
 import os
+import uuid
 from app import app, db, Company, Courier, Order, TreasuryTransaction, CourierSettlement
 
 @pytest.fixture
@@ -1560,6 +1561,94 @@ def test_courier_settlement_history_and_stats(client):
     res_empty_month = client.get(f'/accounting/courier?courier_id={cour_id}&month=2020-01')
     assert res_empty_month.status_code == 200
     assert f'#{settlement_id}' not in res_empty_month.get_data(as_text=True)
+
+
+def test_order_resettlement_preserves_history_in_both_settlements(client):
+    """
+    Verify that when an order returns to the warehouse and is later settled again
+    with another courier (or same courier), both settlements retain the order in their
+    respective history snapshot without overwriting.
+    """
+    with app.app_context():
+        c1 = Courier(name='مندوب أول', phone='01011111111')
+        c2 = Courier(name='مندوب ثاني', phone='01022222222')
+        comp = Company(name='شركة تجربة')
+        db.session.add_all([c1, c2, comp])
+        db.session.commit()
+        c1_id = c1.id
+        c2_id = c2.id
+        comp_id = comp.id
+
+        ord1 = Order(
+            tracking_number=f'TRK-SNAP-{uuid.uuid4().hex[:6]}',
+            client_name='عميل تجريبي',
+            phone='01000000000',
+            address='القاهرة',
+            region='القاهرة',
+            cod=500.0,
+            shipping_fee=70.0,
+            status='مع المندوب',
+            courier_id=c1_id,
+            company_id=comp_id
+        )
+        db.session.add(ord1)
+        db.session.commit()
+        ord1_id = ord1.id
+
+    # 1. Settle with Courier 1 as returned to warehouse
+    res1 = client.post(f'/accounting/courier?courier_id={c1_id}', data={
+        'action': 'settle',
+        f'status_{ord1_id}': 'مرتجع_مخزن',
+        f'collected_{ord1_id}': '0',
+        f'courier_fee_{ord1_id}': '0',
+        'transfers': '0'
+    }, follow_redirects=True)
+    assert res1.status_code == 200
+
+    with app.app_context():
+        s1 = CourierSettlement.query.filter_by(courier_id=c1_id).order_by(CourierSettlement.id.desc()).first()
+        assert s1 is not None
+        s1_id = s1.id
+
+        # Now re-assign order to Courier 2
+        o_re = db.session.get(Order, ord1_id)
+        o_re.courier_id = c2_id
+        o_re.courier_settled = False
+        o_re.status = 'مع المندوب'
+        db.session.commit()
+
+    # 2. Settle with Courier 2 as delivered
+    res2 = client.post(f'/accounting/courier?courier_id={c2_id}', data={
+        'action': 'settle',
+        f'status_{ord1_id}': 'تم التوصيل',
+        f'collected_{ord1_id}': '500',
+        f'courier_fee_{ord1_id}': '50',
+        'transfers': '0'
+    }, follow_redirects=True)
+    assert res2.status_code == 200
+
+    with app.app_context():
+        s2 = CourierSettlement.query.filter_by(courier_id=c2_id).order_by(CourierSettlement.id.desc()).first()
+        assert s2 is not None
+        s2_id = s2.id
+
+    # 3. Check API for Settlement 1: must STILL contain ord1 with status return!
+    res_s1 = client.get(f'/api/courier_settlement/{s1_id}')
+    assert res_s1.status_code == 200
+    data_s1 = res_s1.get_json()
+    assert len(data_s1['orders']) == 1
+    assert data_s1['orders'][0]['id'] == ord1_id
+    assert data_s1['orders'][0]['status'] == 'مخزن'
+
+    # 4. Check API for Settlement 2: contains ord1 with status delivered!
+    res_s2 = client.get(f'/api/courier_settlement/{s2_id}')
+    assert res_s2.status_code == 200
+    data_s2 = res_s2.get_json()
+    assert len(data_s2['orders']) == 1
+    assert data_s2['orders'][0]['id'] == ord1_id
+    assert data_s2['orders'][0]['status'] == 'تم التوصيل'
+    assert data_s2['orders'][0]['collected_amount'] == 500.0
+
 
 
 
