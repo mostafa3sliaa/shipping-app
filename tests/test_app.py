@@ -1650,5 +1650,62 @@ def test_order_resettlement_preserves_history_in_both_settlements(client):
     assert data_s2['orders'][0]['collected_amount'] == 500.0
 
 
+def test_bulk_action_return_does_not_reopen_settled_courier_custody(client):
+    """
+    Verify that when an order is settled with a courier and later marked as 'return'
+    in bulk actions, it does NOT reopen the courier custody or reverse treasury.
+    """
+    with app.app_context():
+        c = Courier(name='مندوب اختبار', phone='01055555555')
+        db.session.add(c)
+        db.session.commit()
+        cid = c.id
+
+        ord1 = Order(
+            tracking_number=f'TRK-BULK-{uuid.uuid4().hex[:6]}',
+            client_name='عميل اختبار',
+            status='مع المندوب',
+            cod=300.0,
+            courier_id=cid
+        )
+        db.session.add(ord1)
+        db.session.commit()
+        oid = ord1.id
+
+    # 1. Settle with courier as return with shipping fee (50 fee, 70 collected)
+    res_settle = client.post(f'/accounting/courier?courier_id={cid}', data={
+        'action': 'settle',
+        f'status_{oid}': 'مرتجع بشحن',
+        f'collected_{oid}': '70',
+        f'courier_fee_{oid}': '50',
+        'transfers': '0'
+    }, follow_redirects=True)
+    assert res_settle.status_code == 200
+
+    with app.app_context():
+        o = db.session.get(Order, oid)
+        assert o.courier_settled is True
+
+    # 2. Trigger bulk action 'return' from orders list
+    res_bulk = client.post('/orders/bulk_action', data={
+        'action': 'return',
+        'order_ids': [str(oid)]
+    }, follow_redirects=True)
+    assert res_bulk.status_code == 200
+
+    # 3. Verify order is now unassigned from courier, and courier custody is NOT reopened
+    with app.app_context():
+        o = db.session.get(Order, oid)
+        assert o.status == 'مرتجع'
+        assert o.courier_id is None # Detached from courier!
+        assert o.courier_settled is True # Remains settled!
+
+    # 4. Courier accounting page must show 0 open orders!
+    res_courier = client.get(f'/accounting/courier?courier_id={cid}')
+    assert res_courier.status_code == 200
+    assert 'لا توجد أوردرات مفتوحة حالياً في عهدة هذا المندوب' in res_courier.get_data(as_text=True)
+
+
+
 
 

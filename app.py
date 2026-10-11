@@ -1215,12 +1215,15 @@ def scan():
                     reverse_order_treasury_collection(order, reason='تحويل لمرتجع شركة عبر الباركود')
                 order.status = 'مرتجع شركة'
                 order.courier_settled = True
+                order.courier_id = None
                 db.session.commit()
                 flash(f'تم تحويل الأوردر {tracking_number} لمرتجع شركة', 'dark')
             elif action == 'return':
-                if order.courier_settled:
-                    reverse_order_treasury_collection(order, reason='تحويل لمرتجع عبر الباركود')
+                if not order.courier_settled:
+                    order.collected_amount = None
+                    order.courier_fee = None
                 order.status = 'مرتجع'
+                order.courier_id = None
                 db.session.commit()
                 flash(f'تم تحويل الأوردر {tracking_number} لمرتجع', 'danger')
             return redirect(url_for('index', tab='scan'))
@@ -1316,6 +1319,7 @@ def bulk_action():
                 order.courier_fee = None
             order.status = 'مرتجع شركة'
             order.courier_settled = True
+            order.courier_id = None
         updated_details.append('الحالة: مرتجع شركة')
     elif action == 'delivered':
         for order in orders_to_update:
@@ -1325,12 +1329,11 @@ def bulk_action():
         updated_details.append('الحالة: تم التوصيل')
     elif action == 'return':
         for order in orders_to_update:
-            if order.courier_settled:
-                reverse_order_treasury_collection(order, reason='تحويل لمرتجع')
-            else:
+            if not order.courier_settled:
                 order.collected_amount = None
                 order.courier_fee = None
             order.status = 'مرتجع'
+            order.courier_id = None
         updated_details.append('الحالة: مرتجع')
     elif action == 'unmark_copied':
         for order in orders_to_update:
