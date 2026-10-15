@@ -795,20 +795,57 @@ def export_excel():
     
     columns = [
         'رقم البوليصة', 'العميل', 'رقم التليفون', 'المنطقة', 'العنوان',
-        'الشركة', 'المندوب', 'الإجمالي', 'الشحن', 'الصافي',
+        'المنتج', 'الشركة', 'المندوب', 'قيمة الأوردر (COD)',
+        'الإجمالي بالشحن', 'الشحن', 'الإجمالي بدون الشحن (الصافي)',
         'عمولة المندوب', 'الحالة', 'التاريخ'
     ]
     
     data = []
     for o in orders:
-        # Use collected_amount if present (partial delivery), otherwise cod
-        total_cod = (o.collected_amount if o.collected_amount is not None else o.cod) or 0.0
-        shipping = o.shipping_fee or 0.0
-        net = total_cod - shipping
-        
-        status_display = o.status or ''
+        status_val = o.status or ''
+        status_display = status_val
         if o.status == 'مع المندوب' and o.courier:
             status_display = f"مع المندوب ({o.courier.name})"
+
+        cod_val = float(o.cod or 0.0)
+        shipping_val = float(o.shipping_fee or 0.0)
+
+        # Precise calculation matching system rules:
+        if status_val in ['مرتجع', 'مرتجع شركة']:
+            if o.collected_amount and o.collected_amount > 0 and (o.cod is None or o.collected_amount < o.cod):
+                # أوردرات شحن بس: تم تحصيل قيمة الشحن فقط من العميل والبضاعة رجعت
+                collected_shipping = float(o.collected_amount)
+                total_with_shipping = collected_shipping
+                shipping = collected_shipping
+                total_without_shipping = 0.0
+                status_display = f"{status_val} (شحن فقط: {int(collected_shipping)} ج.م)"
+            else:
+                # أوردرات صفر: مرتجع نهائي بدون تحصيل أي مبالغ
+                total_with_shipping = 0.0
+                shipping = 0.0
+                total_without_shipping = 0.0
+        elif status_val == 'مرتجع بشحن':
+            # أوردرات شحن بس:
+            collected_shipping = float(o.collected_amount) if (o.collected_amount and o.collected_amount > 0) else (shipping_val or 70.0)
+            total_with_shipping = collected_shipping
+            shipping = collected_shipping
+            total_without_shipping = 0.0
+            status_display = f"مرتجع بشحن ({int(collected_shipping)} ج.م)"
+        elif status_val == 'تسليم جزئي / مرتجع':
+            # تسليم جزئي: المحصل الفعلي شامل الشحن
+            total_with_shipping = float(o.collected_amount if o.collected_amount is not None else cod_val)
+            shipping = shipping_val
+            total_without_shipping = max(0.0, total_with_shipping - shipping)
+        elif status_val == 'تم التوصيل':
+            # تم التوصيل: المبلغ المسلم
+            total_with_shipping = float(o.collected_amount if o.collected_amount is not None else cod_val)
+            shipping = shipping_val
+            total_without_shipping = max(0.0, total_with_shipping - shipping)
+        else:
+            # أوردرات مفتوحة (مخزن / مع المندوب / مؤجل)
+            total_with_shipping = cod_val
+            shipping = shipping_val
+            total_without_shipping = max(0.0, total_with_shipping - shipping)
             
         data.append({
             'رقم البوليصة': o.tracking_number or '',
@@ -816,12 +853,14 @@ def export_excel():
             'رقم التليفون': o.phone or '',
             'المنطقة': o.region or '',
             'العنوان': o.address or '',
+            'المنتج': o.content or '',
             'الشركة': o.company.name if o.company else '',
             'المندوب': o.courier.name if o.courier else '',
-            'الإجمالي': total_cod,
+            'قيمة الأوردر (COD)': cod_val,
+            'الإجمالي بالشحن': total_with_shipping,
             'الشحن': shipping,
-            'الصافي': net,
-            'عمولة المندوب': o.courier_fee or 0.0,
+            'الإجمالي بدون الشحن (الصافي)': total_without_shipping,
+            'عمولة المندوب': float(o.courier_fee or 0.0),
             'الحالة': status_display,
             'التاريخ': o.created_at.strftime('%Y-%m-%d') if o.created_at else ''
         })
@@ -835,11 +874,13 @@ def export_excel():
             'رقم التليفون': '',
             'المنطقة': '',
             'العنوان': '',
+            'المنتج': f'عدد الأوردرات: {len(df)}',
             'الشركة': '',
             'المندوب': '',
-            'الإجمالي': df['الإجمالي'].sum(),
+            'قيمة الأوردر (COD)': df['قيمة الأوردر (COD)'].sum(),
+            'الإجمالي بالشحن': df['الإجمالي بالشحن'].sum(),
             'الشحن': df['الشحن'].sum(),
-            'الصافي': df['الصافي'].sum(),
+            'الإجمالي بدون الشحن (الصافي)': df['الإجمالي بدون الشحن (الصافي)'].sum(),
             'عمولة المندوب': df['عمولة المندوب'].sum(),
             'الحالة': '',
             'التاريخ': ''
@@ -847,9 +888,14 @@ def export_excel():
         df = pd.concat([df, pd.DataFrame([totals])], ignore_index=True)
     
     output = BytesIO()
-    # use ExcelWriter
+    # use ExcelWriter with rightToLeft for Arabic
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Orders')
+        try:
+            ws = writer.sheets['Orders']
+            ws.views.sheetView[0].rightToLeft = True
+        except Exception:
+            pass
         
     output.seek(0)
     
@@ -1950,7 +1996,7 @@ def export_courier_excel(courier_id):
             'مبلغ التحصيل (COD)': o.cod,
             'الحالة': status_display,
             'الشركة': o.company.name if o.company else '',
-            'المحتوى': o.content
+            'المنتج': o.content or ''
         })
         
     df = pd.DataFrame(data)
@@ -1965,12 +2011,17 @@ def export_courier_excel(courier_id):
             'مبلغ التحصيل (COD)': df['مبلغ التحصيل (COD)'].sum(),
             'الحالة': '',
             'الشركة': '',
-            'المحتوى': ''
+            'المنتج': f'عدد الأوردرات: {len(df)}'
         }
         df = pd.concat([df, pd.DataFrame([totals])], ignore_index=True)
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         df.to_excel(writer, index=False, sheet_name='Orders')
+        try:
+            ws = writer.sheets['Orders']
+            ws.views.sheetView[0].rightToLeft = True
+        except Exception:
+            pass
         
     output.seek(0)
     timestamp = datetime.now().strftime("%Y%m%d")

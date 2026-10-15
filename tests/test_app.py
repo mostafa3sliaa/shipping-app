@@ -1706,6 +1706,124 @@ def test_bulk_action_return_does_not_reopen_settled_courier_custody(client):
     assert 'لا توجد أوردرات مفتوحة حالياً في عهدة هذا المندوب' in res_courier.get_data(as_text=True)
 
 
+def test_export_excel_with_product_and_accurate_return_and_partial_totals(client):
+    """
+    Verify that exported Excel contains 'المنتج', and accurate calculations for:
+    - Pure returns: 0 with shipping, 0 shipping, 0 without shipping
+    - Return with shipping: shipping with shipping, shipping, 0 without shipping
+    - Partial delivery: collected with shipping, shipping, collected - shipping without shipping
+    - Delivered: cod with shipping, shipping, cod - shipping without shipping
+    - Bottom total accurately sums without inflating returned orders
+    """
+    import pandas as pd
+    import io
+
+    with app.app_context():
+        comp = Company(name='شركة الحسابات الدقيقة')
+        db.session.add(comp)
+        db.session.commit()
+        comp_id = comp.id
+
+        # 1. Delivered order
+        o1 = Order(
+            tracking_number=f'TRK-DEL-{uuid.uuid4().hex[:6]}',
+            client_name='عميل تم التوصيل',
+            content='سوت جنزاري XXL',
+            status='تم التوصيل',
+            cod=500.0,
+            shipping_fee=70.0,
+            company_id=comp_id
+        )
+        # 2. Partial delivery order
+        o2 = Order(
+            tracking_number=f'TRK-PART-{uuid.uuid4().hex[:6]}',
+            client_name='عميل تسليم جزئي',
+            content='سوت كيوي وسوت اسود',
+            status='تسليم جزئي / مرتجع',
+            cod=1000.0,
+            collected_amount=400.0,
+            shipping_fee=70.0,
+            company_id=comp_id
+        )
+        # 3. Return with shipping only
+        o3 = Order(
+            tracking_number=f'TRK-RET-SHP-{uuid.uuid4().hex[:6]}',
+            client_name='عميل شحن بس',
+            content='طقم كاجوال',
+            status='مرتجع',
+            cod=600.0,
+            collected_amount=70.0,
+            shipping_fee=70.0,
+            company_id=comp_id
+        )
+        # 4. Pure return (zero collected)
+        o4 = Order(
+            tracking_number=f'TRK-RET-ZERO-{uuid.uuid4().hex[:6]}',
+            client_name='عميل مرتجع صفر',
+            content='فستان بناتي',
+            status='مرتجع',
+            cod=700.0,
+            collected_amount=None,
+            shipping_fee=70.0,
+            company_id=comp_id
+        )
+        db.session.add_all([o1, o2, o3, o4])
+        db.session.commit()
+        ids = [o1.id, o2.id, o3.id, o4.id]
+
+    res = client.post('/export_excel', data={'order_ids': [str(x) for x in ids]})
+    assert res.status_code == 200
+
+    df = pd.read_excel(io.BytesIO(res.data), sheet_name='Orders')
+
+    # Verify column existence
+    assert 'المنتج' in df.columns
+    assert 'الإجمالي بالشحن' in df.columns
+    assert 'الشحن' in df.columns
+    assert 'الإجمالي بدون الشحن (الصافي)' in df.columns
+
+    # Verify rows (last row is totals row, so length is 5)
+    assert len(df) == 5
+
+    # Check products in order rows
+    assert df.loc[df['رقم البوليصة'] == o1.tracking_number, 'المنتج'].values[0] == 'سوت جنزاري XXL'
+    assert df.loc[df['رقم البوليصة'] == o2.tracking_number, 'المنتج'].values[0] == 'سوت كيوي وسوت اسود'
+    assert df.loc[df['رقم البوليصة'] == o3.tracking_number, 'المنتج'].values[0] == 'طقم كاجوال'
+    assert df.loc[df['رقم البوليصة'] == o4.tracking_number, 'المنتج'].values[0] == 'فستان بناتي'
+
+    # Check delivered order values
+    row_del = df.loc[df['رقم البوليصة'] == o1.tracking_number].iloc[0]
+    assert row_del['الإجمالي بالشحن'] == 500.0
+    assert row_del['الشحن'] == 70.0
+    assert row_del['الإجمالي بدون الشحن (الصافي)'] == 430.0
+
+    # Check partial delivery order values
+    row_part = df.loc[df['رقم البوليصة'] == o2.tracking_number].iloc[0]
+    assert row_part['الإجمالي بالشحن'] == 400.0
+    assert row_part['الشحن'] == 70.0
+    assert row_part['الإجمالي بدون الشحن (الصافي)'] == 330.0
+
+    # Check return with shipping only (شحن بس)
+    row_ret_shp = df.loc[df['رقم البوليصة'] == o3.tracking_number].iloc[0]
+    assert row_ret_shp['الإجمالي بالشحن'] == 70.0
+    assert row_ret_shp['الشحن'] == 70.0
+    assert row_ret_shp['الإجمالي بدون الشحن (الصافي)'] == 0.0
+
+    # Check pure return (صفر)
+    row_ret_zero = df.loc[df['رقم البوليصة'] == o4.tracking_number].iloc[0]
+    assert row_ret_zero['الإجمالي بالشحن'] == 0.0
+    assert row_ret_zero['الشحن'] == 0.0
+    assert row_ret_zero['الإجمالي بدون الشحن (الصافي)'] == 0.0
+
+    # Check grand totals row
+    row_totals = df.iloc[-1]
+    assert row_totals['رقم البوليصة'] == 'الإجمالي الكلي'
+    assert row_totals['الإجمالي بالشحن'] == 500.0 + 400.0 + 70.0 + 0.0  # 970.0
+    assert row_totals['الشحن'] == 70.0 + 70.0 + 70.0 + 0.0  # 210.0
+    assert row_totals['الإجمالي بدون الشحن (الصافي)'] == 430.0 + 330.0 + 0.0 + 0.0  # 760.0
+
+
+
 
 
 
